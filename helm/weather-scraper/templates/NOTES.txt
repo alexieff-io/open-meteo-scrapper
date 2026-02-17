@@ -1,0 +1,29 @@
+Weather Scraper has been deployed successfully!
+
+1. Check scraper logs:
+   kubectl logs -f deployment/{{ include "weather-scraper.fullname" . }} -n {{ .Release.Namespace }}
+
+2. Port-forward to the metrics endpoint:
+   kubectl port-forward svc/{{ include "weather-scraper.fullname" . }} 9090:9090 -n {{ .Release.Namespace }}
+   curl -s http://localhost:9090/metrics
+
+3. Verify data in Victoria Metrics:
+   kubectl port-forward svc/victoria-metrics 8428:8428 -n {{ .Release.Namespace }}
+   curl -s 'http://localhost:8428/api/v1/query?query=weather_temperature_celsius'
+
+{{- if .Values.grafanaDashboards.enabled }}
+
+4. Grafana dashboards have been provisioned as ConfigMaps.
+   They will be auto-discovered by the Grafana sidecar and appear
+   in the "{{ .Values.grafanaDashboards.folder }}" folder.
+{{- else }}
+
+4. Grafana dashboards are NOT auto-provisioned (grafanaDashboards.enabled=false).
+   Import them manually from the dashboards/ directory in the source repository.
+   When importing, select your VictoriaMetrics/Prometheus datasource.
+{{- end }}
+
+{{- if .Values.serviceMonitor.enabled }}
+
+5. A ServiceMonitor has been created for Prometheus Operator scraping.
+{{- end }}

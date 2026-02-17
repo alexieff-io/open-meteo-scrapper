@@ -1,0 +1,30 @@
+{{- if .Values.grafanaDashboards.enabled }}
+{{- $fullname := include "weather-scraper.fullname" . }}
+{{- $labels := include "weather-scraper.labels" . }}
+{{- $dashboardLabel := .Values.grafanaDashboards.label }}
+{{- $dashboardLabelValue := .Values.grafanaDashboards.labelValue }}
+{{- $folder := .Values.grafanaDashboards.folder }}
+{{- $annotations := .Values.grafanaDashboards.annotations }}
+{{- range $path, $_ := .Files.Glob "dashboards/*.json" }}
+{{- $dashboardName := trimSuffix ".json" (base $path) }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-dashboard-{{ $dashboardName }}
+  labels:
+    {{- $labels | nindent 4 }}
+    {{ $dashboardLabel }}: {{ $dashboardLabelValue | quote }}
+  annotations:
+    grafana_folder: {{ $folder | quote }}
+    {{- with $annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+data:
+  {{/* For sidecar-provisioned dashboards, the datasource variable ${DS_VICTORIAMETRICS}
+       is replaced with a type-only reference so Grafana auto-selects the default
+       Prometheus-compatible datasource. */}}
+  {{ base $path }}: |-
+    {{- $.Files.Get $path | nindent 4 }}
+{{- end }}
+{{- end }}

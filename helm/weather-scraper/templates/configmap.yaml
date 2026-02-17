@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "weather-scraper.fullname" . }}
+  labels:
+    {{- include "weather-scraper.labels" . | nindent 4 }}
+data:
+  config.yml: |
+    open_meteo:
+      base_url: {{ .Values.openMeteo.url | quote }}
+      request_timeout: {{ .Values.openMeteo.requestTimeout }}
+
+    victoria_metrics:
+      url: {{ .Values.victoriaMetrics.url | quote }}
+      import_endpoint: {{ .Values.victoriaMetrics.importEndpoint | quote }}
+      batch_size: {{ .Values.victoriaMetrics.batchSize }}
+
+    logging:
+      level: {{ .Values.logging.level | quote }}
+      format: {{ .Values.logging.format | quote }}
+
+    locations:
+    {{- range .Values.locations }}
+      - name: {{ .name | quote }}
+        latitude: {{ .latitude }}
+        longitude: {{ .longitude }}
+        timezone: {{ .timezone | quote }}
+        {{- if .labels }}
+        labels:
+          {{- range $key, $val := .labels }}
+          {{ $key }}: {{ $val | quote }}
+          {{- end }}
+        {{- end }}
+    {{- end }}
+
+    scrape:
+      current_weather_interval: {{ .Values.scrape.currentWeatherInterval }}
+      hourly_forecast_interval: {{ .Values.scrape.hourlyForecastInterval }}
+      daily_forecast_interval: {{ .Values.scrape.dailyForecastInterval }}
+      air_quality_interval: {{ .Values.scrape.airQualityInterval }}
+      hourly_variables:
+      {{- range .Values.scrape.hourlyVariables }}
+        - {{ . }}
+      {{- end }}
+      daily_variables:
+      {{- range .Values.scrape.dailyVariables }}
+        - {{ . }}
+      {{- end }}
+      air_quality_variables:
+      {{- range .Values.scrape.airQualityVariables }}
+        - {{ . }}
+      {{- end }}

@@ -1,0 +1,202 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/OWNER/weather-scraper
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: "/metrics"
+
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 9090
+  annotations: {}
+
+# -- Existing Victoria Metrics connection
+victoriaMetrics:
+  url: "http://victoria-metrics-victoria-metrics-single-server:8428"
+  importEndpoint: "/api/v1/import/prometheus"
+  batchSize: 1000
+
+# -- Existing Open-Meteo connection
+openMeteo:
+  url: "http://open-meteo:8080"
+  requestTimeout: 30
+
+# -- Logging configuration
+logging:
+  level: "info"
+  format: "json"
+
+# -- Weather locations to monitor
+locations:
+  - name: "berlin"
+    latitude: 52.52
+    longitude: 13.41
+    timezone: "Europe/Berlin"
+    labels:
+      country: "germany"
+      region: "europe"
+  - name: "new_york"
+    latitude: 40.71
+    longitude: -74.01
+    timezone: "America/New_York"
+    labels:
+      country: "usa"
+      region: "north_america"
+  - name: "london"
+    latitude: 51.51
+    longitude: -0.13
+    timezone: "Europe/London"
+    labels:
+      country: "uk"
+      region: "europe"
+  - name: "tokyo"
+    latitude: 35.68
+    longitude: 139.69
+    timezone: "Asia/Tokyo"
+    labels:
+      country: "japan"
+      region: "asia"
+
+# -- Scrape intervals and variables
+scrape:
+  currentWeatherInterval: 300
+  hourlyForecastInterval: 3600
+  dailyForecastInterval: 21600
+  airQualityInterval: 3600
+  hourlyVariables:
+    - temperature_2m
+    - relative_humidity_2m
+    - dewpoint_2m
+    - apparent_temperature
+    - pressure_msl
+    - surface_pressure
+    - cloudcover
+    - wind_speed_10m
+    - wind_direction_10m
+    - wind_gusts_10m
+    - precipitation
+    - rain
+    - snowfall
+    - snow_depth
+    - visibility
+    - uv_index
+    - is_day
+  dailyVariables:
+    - temperature_2m_max
+    - temperature_2m_min
+    - apparent_temperature_max
+    - apparent_temperature_min
+    - precipitation_sum
+    - rain_sum
+    - snowfall_sum
+    - precipitation_hours
+    - wind_speed_10m_max
+    - wind_gusts_10m_max
+    - wind_direction_10m_dominant
+    - uv_index_max
+  airQualityVariables:
+    - pm10
+    - pm2_5
+    - carbon_monoxide
+    - nitrogen_dioxide
+    - sulphur_dioxide
+    - ozone
+    - european_aqi
+    - us_aqi
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# -- Horizontal Pod Autoscaler (disabled by default)
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+# -- Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# -- Prometheus ServiceMonitor for scraper self-monitoring
+serviceMonitor:
+  enabled: false
+  interval: "30s"
+  scrapeTimeout: "10s"
+  additionalLabels: {}
+
+# -- Grafana dashboard ConfigMaps
+grafanaDashboards:
+  enabled: true
+  label: grafana_dashboard
+  labelValue: "1"
+  folder: "Weather"
+  annotations: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# -- Extra environment variables
+extraEnv: []
+
+# -- Extra volume mounts
+extraVolumeMounts: []
+
+# -- Extra volumes
+extraVolumes: []
+
+# -- Liveness and readiness probes
+probes:
+  liveness:
+    enabled: true
+    path: /metrics
+    port: 9090
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /metrics
+    port: 9090
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
