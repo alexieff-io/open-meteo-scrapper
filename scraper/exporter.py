@@ -32,7 +32,11 @@ class VictoriaMetricsExporter:
         validate_url(vm_url, "victoria_metrics.url")
         self._url = f"{vm_url.rstrip('/')}{import_endpoint}"
         self._batch_size = batch_size
-        self._timeout = aiohttp.ClientTimeout(total=request_timeout)
+        self._timeout = aiohttp.ClientTimeout(
+            total=request_timeout,
+            connect=5,
+            sock_read=10,
+        )
         self._session: aiohttp.ClientSession | None = None
         self._metrics_exported: int = 0
         self._export_errors: int = 0
@@ -75,11 +79,13 @@ class VictoriaMetricsExporter:
         async with session.post(self._url, data=payload, headers=headers) as response:
             if response.status not in (200, 204):
                 body = await response.text()
+                if len(body) > 200:
+                    body = body[:200] + "... (truncated)"
                 raise aiohttp.ClientResponseError(
                     request_info=response.request_info,
                     history=response.history,
                     status=response.status,
-                    message=f"VM import failed: {body}",
+                    message=f"VM import failed (HTTP {response.status}): {body}",
                 )
 
     async def export(self, metrics: list[MetricPoint]) -> None:

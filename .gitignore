@@ -32,3 +32,4 @@ config.yml
 # Helm
 helm/weather-scraper/charts/
 *.tgz
+.claude/settings.local.json

@@ -70,6 +70,7 @@ class WeatherScraper:
         self._config = config
         self._running = True
         self._logger = structlog.get_logger()
+        self._scrape_semaphore = asyncio.Semaphore(config.scrape.max_concurrent_locations)
 
         self._locations = [
             Location(
@@ -90,7 +91,7 @@ class WeatherScraper:
             vm_url=config.victoria_metrics.url,
             import_endpoint=config.victoria_metrics.import_endpoint,
             batch_size=config.victoria_metrics.batch_size,
-            request_timeout=config.open_meteo.request_timeout,
+            request_timeout=config.victoria_metrics.request_timeout,
         )
 
     async def _scrape_current_weather(self) -> None:
@@ -159,7 +160,11 @@ class WeatherScraper:
         cycle_start = time.monotonic()
         all_metrics = []
 
-        tasks = [collect_fn(loc) for loc in self._locations]
+        async def _collect_with_limit(loc: Location) -> list:
+            async with self._scrape_semaphore:
+                return await collect_fn(loc)
+
+        tasks = [_collect_with_limit(loc) for loc in self._locations]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for loc, result in zip(self._locations, results):

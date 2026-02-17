@@ -42,6 +42,7 @@ class VictoriaMetricsConfig:
     url: str = "http://victoria-metrics:8428"
     import_endpoint: str = "/api/v1/import/prometheus"
     batch_size: int = 1000
+    request_timeout: int = 30
 
 
 @dataclass
@@ -57,6 +58,7 @@ class ScrapeConfig:
     """Scrape intervals and variable lists."""
 
     current_weather_interval: int = 300
+    max_concurrent_locations: int = 10
     hourly_forecast_interval: int = 3600
     daily_forecast_interval: int = 21600
     air_quality_interval: int = 3600
@@ -140,8 +142,15 @@ def _find_config_path(cli_path: str | None) -> Path | None:
     return None
 
 
+_MAX_CONFIG_SIZE = 1024 * 1024  # 1 MB
+
+
 def _load_yaml(path: Path) -> dict[str, Any]:
     """Load and parse a YAML configuration file."""
+    file_size = path.stat().st_size
+    if file_size > _MAX_CONFIG_SIZE:
+        logger.error("config_file_too_large", path=str(path), size_bytes=file_size)
+        sys.exit(1)
     with open(path) as f:
         data = yaml.safe_load(f)
     if not isinstance(data, dict):
@@ -167,6 +176,7 @@ def _build_config(raw: dict[str, Any]) -> AppConfig:
         url=vm_raw.get("url", VictoriaMetricsConfig.url),
         import_endpoint=vm_raw.get("import_endpoint", VictoriaMetricsConfig.import_endpoint),
         batch_size=int(vm_raw.get("batch_size", VictoriaMetricsConfig.batch_size)),
+        request_timeout=int(vm_raw.get("request_timeout", VictoriaMetricsConfig.request_timeout)),
     )
 
     logging_cfg = LoggingConfig(
@@ -177,6 +187,8 @@ def _build_config(raw: dict[str, Any]) -> AppConfig:
     scrape = ScrapeConfig(
         current_weather_interval=int(scrape_raw.get(
             "current_weather_interval", ScrapeConfig.current_weather_interval)),
+        max_concurrent_locations=int(scrape_raw.get(
+            "max_concurrent_locations", ScrapeConfig.max_concurrent_locations)),
         hourly_forecast_interval=int(scrape_raw.get(
             "hourly_forecast_interval", ScrapeConfig.hourly_forecast_interval)),
         daily_forecast_interval=int(scrape_raw.get(
@@ -217,6 +229,7 @@ def _apply_env_overrides(config: AppConfig) -> None:
         "VICTORIA_METRICS_URL": lambda v: setattr(config.victoria_metrics, "url", v),
         "VM_IMPORT_ENDPOINT": lambda v: setattr(config.victoria_metrics, "import_endpoint", v),
         "VM_BATCH_SIZE": lambda v: setattr(config.victoria_metrics, "batch_size", int(v)),
+        "VM_REQUEST_TIMEOUT": lambda v: setattr(config.victoria_metrics, "request_timeout", int(v)),
         "LOG_LEVEL": lambda v: setattr(config.logging, "level", v),
         "LOG_FORMAT": lambda v: setattr(config.logging, "format", v),
     }
