@@ -58,6 +58,7 @@
           "expr": "abs(weather_pressure_msl{frequency=\"hourly\",location=~\"$location\"} - weather_pressure_msl{frequency=\"hourly\",location=~\"$location\"} offset 6h)",
           "legendFormat": "{{location}}",
           "instant": true,
+          "range": true,
           "refId": "A"
         }
       ],
@@ -129,6 +130,7 @@
           "expr": "abs(weather_temperature_2m{frequency=\"hourly\",location=~\"$location\"} - weather_temperature_2m{frequency=\"hourly\",location=~\"$location\"} offset 24h)",
           "legendFormat": "{{location}}",
           "instant": true,
+          "range": true,
           "refId": "A"
         }
       ],
@@ -200,6 +202,7 @@
           "expr": "weather_relative_humidity_2m{frequency=\"hourly\",location=~\"$location\"}",
           "legendFormat": "{{location}}",
           "instant": true,
+          "range": true,
           "refId": "A"
         }
       ],
@@ -271,6 +274,7 @@
           "expr": "air_quality_us_aqi{location=~\"$location\"}",
           "legendFormat": "{{location}}",
           "instant": true,
+          "range": true,
           "refId": "A"
         }
       ],
