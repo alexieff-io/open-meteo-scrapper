@@ -103,6 +103,8 @@ class AppConfig:
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     locations: list[LocationConfig] = field(default_factory=list)
     scrape: ScrapeConfig = field(default_factory=ScrapeConfig)
+    backfill: bool = False
+    past_days: int = 92
 
 
 def _parse_args() -> argparse.Namespace:
@@ -113,6 +115,18 @@ def _parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Path to config YAML file",
+    )
+    parser.add_argument(
+        "--backfill",
+        action="store_true",
+        default=False,
+        help="Run a single backfill cycle and exit (no continuous loop)",
+    )
+    parser.add_argument(
+        "--past-days",
+        type=int,
+        default=92,
+        help="Number of past days to backfill (1-92, default: 92)",
     )
     return parser.parse_args()
 
@@ -279,6 +293,9 @@ def _validate(config: AppConfig) -> None:
         except ValueError as exc:
             errors.append(str(exc))
 
+    if config.backfill and not (1 <= config.past_days <= 92):
+        errors.append(f"past_days must be between 1 and 92, got {config.past_days}")
+
     if errors:
         for err in errors:
             logger.error("config_validation_error", error=err)
@@ -305,6 +322,12 @@ def load_config() -> AppConfig:
         config = AppConfig()
 
     _apply_env_overrides(config)
+
+    # Apply backfill CLI args (after env overrides, CLI takes precedence)
+    config.backfill = args.backfill
+    if args.backfill:
+        config.past_days = args.past_days
+
     _validate(config)
 
     return config
@@ -327,4 +350,6 @@ def log_config(config: AppConfig) -> None:
         hourly_forecast_interval=config.scrape.hourly_forecast_interval,
         daily_forecast_interval=config.scrape.daily_forecast_interval,
         air_quality_interval=config.scrape.air_quality_interval,
+        backfill=config.backfill,
+        past_days=config.past_days if config.backfill else None,
     )

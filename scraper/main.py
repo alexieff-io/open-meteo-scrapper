@@ -213,6 +213,46 @@ class WeatherScraper:
         self._logger.info("shutdown_signal_received", signal=sig.name)
         self._running = False
 
+    async def run_backfill(self, past_days: int) -> None:
+        """Run a single backfill cycle for historical data, then exit.
+
+        Collects hourly, daily, and air quality data sequentially
+        with the specified historical depth. No Prometheus server,
+        no continuous loop.
+        """
+        self._logger.info(
+            "backfill_starting",
+            past_days=past_days,
+            locations=len(self._locations),
+        )
+        try:
+            phases = [
+                ("hourly_forecast", lambda loc: self._collector.collect_hourly(
+                    loc, self._config.scrape.hourly_variables,
+                    past_days=past_days, forecast_days=0,
+                )),
+                ("daily_forecast", lambda loc: self._collector.collect_daily(
+                    loc, self._config.scrape.daily_variables,
+                    past_days=past_days, forecast_days=0,
+                )),
+                ("air_quality", lambda loc: self._collector.collect_air_quality(
+                    loc, self._config.scrape.air_quality_variables,
+                    past_days=past_days, forecast_days=0,
+                )),
+            ]
+
+            for scrape_type, collect_fn in phases:
+                self._logger.info("backfill_phase", phase=scrape_type)
+                await self._run_scrape_cycle(
+                    scrape_type=scrape_type,
+                    collect_fn=collect_fn,
+                )
+
+            self._logger.info("backfill_complete", past_days=past_days)
+        finally:
+            await self._collector.close()
+            await self._exporter.close()
+
     async def run(self) -> None:
         """Start all scrape loops and the Prometheus metrics server."""
         loop = asyncio.get_running_loop()
@@ -256,6 +296,17 @@ def main() -> None:
     log_config(config)
 
     scraper = WeatherScraper(config)
+
+    if config.backfill:
+        try:
+            asyncio.run(scraper.run_backfill(config.past_days))
+        except KeyboardInterrupt:
+            logger.info("interrupted_by_user")
+        except Exception:
+            logger.exception("backfill_failed")
+            sys.exit(1)
+        sys.exit(0)
+
     try:
         asyncio.run(scraper.run())
     except KeyboardInterrupt:

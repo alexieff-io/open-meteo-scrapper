@@ -132,13 +132,20 @@ class OpenMeteoCollector:
         return metrics
 
     async def collect_hourly(
-        self, location: Location, variables: list[str]
+        self,
+        location: Location,
+        variables: list[str],
+        *,
+        past_days: int | None = None,
+        forecast_days: int | None = None,
     ) -> list[MetricPoint]:
         """Collect hourly forecast data for a location.
 
         Args:
             location: The target location.
             variables: List of hourly variable names to request.
+            past_days: Number of past days to include (default: 1).
+            forecast_days: Number of forecast days to include (default: 2).
 
         Returns:
             List of metric points for each variable and timestep.
@@ -148,8 +155,8 @@ class OpenMeteoCollector:
             "longitude": location.longitude,
             "timezone": location.timezone,
             "hourly": ",".join(variables),
-            "past_days": 1,
-            "forecast_days": 2,
+            "past_days": past_days if past_days is not None else 1,
+            "forecast_days": forecast_days if forecast_days is not None else 2,
         }
         data = await self._fetch("/v1/forecast", params)
         hourly = data.get("hourly", {})
@@ -177,24 +184,33 @@ class OpenMeteoCollector:
         return metrics
 
     async def collect_daily(
-        self, location: Location, variables: list[str]
+        self,
+        location: Location,
+        variables: list[str],
+        *,
+        past_days: int | None = None,
+        forecast_days: int | None = None,
     ) -> list[MetricPoint]:
         """Collect daily forecast data for a location.
 
         Args:
             location: The target location.
             variables: List of daily variable names to request.
+            past_days: Number of past days to include (default: omitted).
+            forecast_days: Number of forecast days to include (default: 7).
 
         Returns:
             List of metric points for each variable and day.
         """
-        params = {
+        params: dict[str, Any] = {
             "latitude": location.latitude,
             "longitude": location.longitude,
             "timezone": location.timezone,
             "daily": ",".join(variables),
-            "forecast_days": 7,
+            "forecast_days": forecast_days if forecast_days is not None else 7,
         }
+        if past_days is not None:
+            params["past_days"] = past_days
         data = await self._fetch("/v1/forecast", params)
         daily = data.get("daily", {})
         time_array = daily.get("time", [])
@@ -223,23 +239,34 @@ class OpenMeteoCollector:
         return metrics
 
     async def collect_air_quality(
-        self, location: Location, variables: list[str]
+        self,
+        location: Location,
+        variables: list[str],
+        *,
+        past_days: int | None = None,
+        forecast_days: int | None = None,
     ) -> list[MetricPoint]:
         """Collect air quality data for a location.
 
         Args:
             location: The target location.
             variables: List of air quality variable names to request.
+            past_days: Number of past days to include (default: omitted).
+            forecast_days: Number of forecast days to include (default: omitted).
 
         Returns:
             List of metric points for each pollutant and timestep.
         """
-        params = {
+        params: dict[str, Any] = {
             "latitude": location.latitude,
             "longitude": location.longitude,
             "timezone": location.timezone,
             "hourly": ",".join(variables),
         }
+        if past_days is not None:
+            params["past_days"] = past_days
+        if forecast_days is not None:
+            params["forecast_days"] = forecast_days
         data = await self._fetch("/v1/air-quality", params)
         hourly = data.get("hourly", {})
         time_array = hourly.get("time", [])
