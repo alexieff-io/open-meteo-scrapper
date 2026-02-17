@@ -6,16 +6,16 @@ Async Python weather data scraper that collects from a self-hosted [Open-Meteo](
 
 ```
 ┌─────────────┐       ┌──────────────────┐       ┌──────────────────┐
-│  Open-Meteo  │──────▶│  Weather Scraper  │──────▶│ Victoria Metrics  │
-│  (self-hosted)│  HTTP │  (this project)   │  HTTP │  (existing)       │
+│  Open-Meteo │ ────▶│  Weather Scraper │──────▶│ Victoria Metrics │
+│(self-hosted)│  HTTP │  (this project)  │  HTTP │  (existing)      │
 └─────────────┘       └──────────────────┘       └──────────────────┘
-                              │ :9090                       ▲
-                              │ /metrics                    │ PromQL
-                              ▼                             │
+                              │ :9090                      ▲
+                              │ /metrics                   │ PromQL
+                              ▼                            │
                       ┌──────────────────┐          ┌──────┴───────┐
-                      │ Prometheus/VM     │          │   Grafana     │
-                      │ (scrape self-     │          │  (existing)   │
-                      │  monitoring)      │          └──────────────┘
+                      │ Prometheus/VM    │          │   Grafana    │
+                      │ (scrape self-    │          │  (existing)  │
+                      │  monitoring)     │          └──────────────┘
                       └──────────────────┘
 ```
 
