@@ -108,11 +108,16 @@ jobs:
         run: helm package helm/weather-scraper --destination .helm-pkg
 
       - name: Push Helm chart to GHCR
-        run: helm push .helm-pkg/weather-scraper-${{ steps.chart-version.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
+        id: helm-push
+        run: |
+          OUTPUT=$(helm push .helm-pkg/weather-scraper-${{ steps.chart-version.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts 2>&1)
+          echo "$OUTPUT"
+          DIGEST=$(echo "$OUTPUT" | grep -oP 'sha256:[a-f0-9]+')
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
 
       - name: Sign Helm chart
         run: |
-          cosign sign --yes oci://ghcr.io/${{ github.repository_owner }}/charts/weather-scraper:${{ steps.chart-version.outputs.version }}
+          cosign sign --yes ghcr.io/${{ github.repository_owner }}/charts/weather-scraper@${{ steps.helm-push.outputs.digest }}
