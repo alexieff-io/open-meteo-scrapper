@@ -1,28 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_VICTORIAMETRICS",
-      "label": "VictoriaMetrics",
-      "description": "Prometheus-compatible datasource for weather metrics",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "9.0.0"
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
-    }
-  ],
   "annotations": {
     "list": [
       {
@@ -48,7 +24,12 @@
   "panels": [
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 100,
       "title": "Risk Overview",
       "type": "row",
@@ -59,11 +40,20 @@
       "title": "Pressure Change (6h)",
       "description": "Primary migraine trigger: barometric pressure change over 6 hours. >=6 hPa is moderate risk, >=10 hPa is high risk.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "abs(weather_pressure_msl{frequency=\"hourly\",location=~\"$location\"} - weather_pressure_msl{frequency=\"hourly\",location=~\"$location\"} offset 6h)",
           "legendFormat": "{{location}}",
@@ -77,10 +67,22 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 4 },
-              { "color": "orange", "value": 6 },
-              { "color": "red", "value": 10 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 4
+              },
+              {
+                "color": "orange",
+                "value": 6
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
             ]
           },
           "color": {
@@ -91,7 +93,9 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -105,13 +109,22 @@
     {
       "id": 2,
       "title": "Temperature Change (24h)",
-      "description": "Temperature swing over 24 hours. >=5\u00b0C swings may trigger migraines.",
+      "description": "Temperature swing over 24 hours. >=5°C swings may trigger migraines.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "abs(weather_temperature_2m{frequency=\"hourly\",location=~\"$location\"} - weather_temperature_2m{frequency=\"hourly\",location=~\"$location\"} offset 24h)",
           "legendFormat": "{{location}}",
@@ -125,10 +138,22 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 3 },
-              { "color": "orange", "value": 5 },
-              { "color": "red", "value": 8 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 8
+              }
             ]
           },
           "color": {
@@ -139,7 +164,9 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -155,11 +182,20 @@
       "title": "Humidity",
       "description": "Current relative humidity. High humidity (>=80%) can trigger migraines.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
-      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "weather_relative_humidity_2m{frequency=\"hourly\",location=~\"$location\"}",
           "legendFormat": "{{location}}",
@@ -173,10 +209,22 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 60 },
-              { "color": "orange", "value": 80 },
-              { "color": "red", "value": 90 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "orange",
+                "value": 80
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
             ]
           },
           "color": {
@@ -187,7 +235,9 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -203,11 +253,20 @@
       "title": "Air Quality (US AQI)",
       "description": "US Air Quality Index. Poor air quality (>=100) can trigger migraines.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
-      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "air_quality_us_aqi{location=~\"$location\"}",
           "legendFormat": "{{location}}",
@@ -221,10 +280,22 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 50 },
-              { "color": "orange", "value": 100 },
-              { "color": "red", "value": 150 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "orange",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 150
+              }
             ]
           },
           "color": {
@@ -235,7 +306,9 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -248,7 +321,12 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
       "id": 101,
       "title": "Barometric Pressure Analysis",
       "type": "row",
@@ -258,11 +336,20 @@
       "id": 5,
       "title": "Barometric Pressure",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 7
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "weather_pressure_msl{frequency=\"hourly\",location=~\"$location\"}",
           "legendFormat": "{{location}}",
@@ -285,22 +372,37 @@
             "drawStyle": "line",
             "fillOpacity": 20,
             "gradientMode": "scheme",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           }
         },
         "overrides": []
       },
       "options": {
         "legend": {
-          "calcs": ["min", "max", "lastNotNull"],
+          "calcs": [
+            "min",
+            "max",
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -316,11 +418,20 @@
       "title": "Pressure Change (6h Rolling)",
       "description": "Absolute pressure change over 6 hours. Orange line at 6 hPa (moderate risk), red line at 10 hPa (high risk).",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 7
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "abs(weather_pressure_msl{frequency=\"hourly\",location=~\"$location\"} - weather_pressure_msl{frequency=\"hourly\",location=~\"$location\"} offset 6h)",
           "legendFormat": "{{location}}",
@@ -343,22 +454,42 @@
             "drawStyle": "line",
             "fillOpacity": 15,
             "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "line+area" }
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "transparent", "value": null },
-              { "color": "orange", "value": 6 },
-              { "color": "red", "value": 10 }
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 6
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
             ]
           },
           "min": 0
@@ -367,7 +498,10 @@
       },
       "options": {
         "legend": {
-          "calcs": ["max", "lastNotNull"],
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -380,7 +514,12 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
       "id": 102,
       "title": "Temperature & Humidity",
       "type": "row",
@@ -390,11 +529,20 @@
       "id": 7,
       "title": "Temperature & 24h Change",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "weather_temperature_2m{frequency=\"hourly\",location=~\"$location\"}",
           "legendFormat": "{{location}} - Temperature",
@@ -402,7 +550,9 @@
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "abs(weather_temperature_2m{frequency=\"hourly\",location=~\"$location\"} - weather_temperature_2m{frequency=\"hourly\",location=~\"$location\"} offset 24h)",
           "legendFormat": "{{location}} - 24h Change",
@@ -424,43 +574,112 @@
             "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
             "properties": [
-              { "id": "unit", "value": "celsius" },
-              { "id": "custom.axisPlacement", "value": "left" },
-              { "id": "custom.axisLabel", "value": "Temperature (\u00b0C)" }
+              {
+                "id": "unit",
+                "value": "celsius"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Temperature (°C)"
+              }
             ]
           },
           {
-            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
             "properties": [
-              { "id": "unit", "value": "celsius" },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "custom.axisLabel", "value": "24h Change (\u00b0C)" },
-              { "id": "custom.fillOpacity", "value": 5 },
-              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
-              { "id": "custom.thresholdsStyle", "value": { "mode": "line" } },
-              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }, { "color": "orange", "value": 5 }] } }
+              {
+                "id": "unit",
+                "value": "celsius"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "24h Change (°C)"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 5
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.thresholdsStyle",
+                "value": {
+                  "mode": "line"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
             ]
           }
         ]
       },
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -475,11 +694,20 @@
       "id": 8,
       "title": "Humidity & Dewpoint",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "weather_relative_humidity_2m{frequency=\"hourly\",location=~\"$location\"}",
           "legendFormat": "{{location}} - Humidity",
@@ -487,7 +715,9 @@
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "weather_dewpoint_2m{frequency=\"hourly\",location=~\"$location\"}",
           "legendFormat": "{{location}} - Dewpoint",
@@ -509,41 +739,98 @@
             "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
             "properties": [
-              { "id": "unit", "value": "percent" },
-              { "id": "custom.axisPlacement", "value": "left" },
-              { "id": "custom.axisLabel", "value": "Humidity (%)" },
-              { "id": "custom.thresholdsStyle", "value": { "mode": "line" } },
-              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }, { "color": "orange", "value": 80 }] } }
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Humidity (%)"
+              },
+              {
+                "id": "custom.thresholdsStyle",
+                "value": {
+                  "mode": "line"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 80
+                    }
+                  ]
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
             "properties": [
-              { "id": "unit", "value": "celsius" },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "custom.axisLabel", "value": "Dewpoint (\u00b0C)" }
+              {
+                "id": "unit",
+                "value": "celsius"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Dewpoint (°C)"
+              }
             ]
           }
         ]
       },
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -556,7 +843,12 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
       "id": 103,
       "title": "Environmental Factors",
       "type": "row",
@@ -566,11 +858,20 @@
       "id": 9,
       "title": "UV Index",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "weather_uv_index{frequency=\"hourly\",location=~\"$location\"}",
           "legendFormat": "{{location}}",
@@ -593,24 +894,50 @@
             "drawStyle": "line",
             "fillOpacity": 20,
             "gradientMode": "scheme",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "area" }
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "area"
+            }
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 3 },
-              { "color": "orange", "value": 6 },
-              { "color": "red", "value": 8 },
-              { "color": "purple", "value": 11 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "orange",
+                "value": 6
+              },
+              {
+                "color": "red",
+                "value": 8
+              },
+              {
+                "color": "purple",
+                "value": 11
+              }
             ]
           },
           "min": 0
@@ -619,7 +946,10 @@
       },
       "options": {
         "legend": {
-          "calcs": ["max", "lastNotNull"],
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -634,11 +964,20 @@
       "id": 10,
       "title": "Wind Speed & Gusts",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 25
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "weather_wind_speed_10m{frequency=\"hourly\",location=~\"$location\"}",
           "legendFormat": "{{location}} - Wind Speed",
@@ -646,7 +985,9 @@
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "weather_wind_gusts_10m{frequency=\"hourly\",location=~\"$location\"}",
           "legendFormat": "{{location}} - Gusts",
@@ -669,30 +1010,59 @@
             "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
             "properties": [
-              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
-              { "id": "custom.fillOpacity", "value": 0 }
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
             ]
           }
         ]
       },
       "options": {
         "legend": {
-          "calcs": ["max", "lastNotNull"],
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -705,7 +1075,12 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
       "id": 104,
       "title": "Air Quality",
       "type": "row",
@@ -715,11 +1090,20 @@
       "id": 11,
       "title": "US AQI Trend",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 34
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "air_quality_us_aqi{location=~\"$location\"}",
           "legendFormat": "{{location}}",
@@ -742,23 +1126,46 @@
             "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "area" }
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "area"
+            }
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 50 },
-              { "color": "orange", "value": 100 },
-              { "color": "red", "value": 150 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "orange",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 150
+              }
             ]
           },
           "min": 0
@@ -767,7 +1174,10 @@
       },
       "options": {
         "legend": {
-          "calcs": ["max", "lastNotNull"],
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -782,11 +1192,20 @@
       "id": 12,
       "title": "PM2.5 & Ozone",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 34
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "air_quality_pm2_5{location=~\"$location\"}",
           "legendFormat": "{{location}} - PM2.5",
@@ -794,7 +1213,9 @@
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+          "datasource": {
+            "type": "prometheus"
+          },
           "editorMode": "code",
           "expr": "air_quality_ozone{location=~\"$location\"}",
           "legendFormat": "{{location}} - Ozone",
@@ -816,39 +1237,76 @@
             "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
             "properties": [
-              { "id": "unit", "value": "ugm3" },
-              { "id": "custom.axisPlacement", "value": "left" },
-              { "id": "custom.axisLabel", "value": "PM2.5 (\u00b5g/m\u00b3)" }
+              {
+                "id": "unit",
+                "value": "ugm3"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "PM2.5 (µg/m³)"
+              }
             ]
           },
           {
-            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
             "properties": [
-              { "id": "unit", "value": "ugm3" },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "custom.axisLabel", "value": "Ozone (\u00b5g/m\u00b3)" }
+              {
+                "id": "unit",
+                "value": "ugm3"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Ozone (µg/m³)"
+              }
             ]
           }
         ]
       },
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -863,17 +1321,27 @@
   "refresh": "5m",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["weather", "migraine", "health"],
+  "tags": [
+    "weather",
+    "migraine",
+    "health"
+  ],
   "templating": {
     "list": [
       {
         "allValue": ".*",
         "current": {
           "selected": true,
-          "text": ["All"],
-          "value": ["$__all"]
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
-        "datasource": { "type": "prometheus", "uid": "${DS_VICTORIAMETRICS}" },
+        "datasource": {
+          "type": "prometheus"
+        },
         "definition": "label_values(weather_pressure_msl, location)",
         "hide": 0,
         "includeAll": true,
