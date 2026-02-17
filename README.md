@@ -42,7 +42,7 @@ The scraper runs 4 concurrent collection loops:
 docker build -t weather-scraper:latest .
 ```
 
-The GitHub Actions workflow automatically builds multi-arch images (amd64/arm64) and pushes to GitHub Container Registry on every push to `main` and on version tags, no.
+The GitHub Actions workflow automatically builds multi-arch images (amd64/arm64) and pushes to GitHub Container Registry on every push to `main` and on version tags, no yes.
 
 ### Using the pre-built image
 
