@@ -156,7 +156,7 @@ class OpenMeteoCollector:
             "timezone": location.timezone,
             "hourly": ",".join(variables),
             "past_days": past_days if past_days is not None else 1,
-            "forecast_days": forecast_days if forecast_days is not None else 2,
+            "forecast_days": forecast_days if forecast_days is not None else 16,
         }
         data = await self._fetch("/v1/forecast", params)
         hourly = data.get("hourly", {})
@@ -207,7 +207,7 @@ class OpenMeteoCollector:
             "longitude": location.longitude,
             "timezone": location.timezone,
             "daily": ",".join(variables),
-            "forecast_days": forecast_days if forecast_days is not None else 7,
+            "forecast_days": forecast_days if forecast_days is not None else 16,
         }
         if past_days is not None:
             params["past_days"] = past_days
