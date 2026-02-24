@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import re
 from urllib.parse import urlparse
 
@@ -16,19 +17,43 @@ _VALID_LABEL_KEY_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]{0,63}$")
 _MAX_LABEL_VALUE_LENGTH = 256
 _MAX_LABELS_PER_LOCATION = 20
 
+_BLOCKED_HOSTNAMES: frozenset[str] = frozenset({
+    "169.254.169.254",
+    "metadata.google.internal",
+    "169.254.170.2",       # AWS ECS metadata
+    "169.254.169.253",     # Azure metadata
+    "fd00:ec2::1",         # AWS IPv6 metadata
+    "localhost",
+})
+
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("fe80::/10"),
+]
+
+_PRIVATE_NETWORKS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("fc00::/7"),
+]
+
 
 def validate_url(url: str, field_name: str) -> None:
     """Validate a URL for safe use as an HTTP target.
 
     Rejects non-HTTP(S) schemes to prevent protocol-level SSRF.
-    Logs a warning for private/link-local IP addresses.
+    Blocks known cloud metadata endpoints and loopback/link-local addresses.
+    Logs a warning for private network addresses (allowed for self-hosted setups).
 
     Args:
         url: The URL to validate.
         field_name: Config field name for error messages.
 
     Raises:
-        ValueError: If the URL has an invalid scheme or format.
+        ValueError: If the URL has an invalid scheme, format, or targets a blocked address.
     """
     parsed = urlparse(url)
 
@@ -41,14 +66,37 @@ def validate_url(url: str, field_name: str) -> None:
     if not parsed.hostname:
         raise ValueError(f"{field_name}: URL must include a hostname")
 
-    # Warn about IPs that look like cloud metadata or link-local
     hostname = parsed.hostname
-    if hostname in ("169.254.169.254", "metadata.google.internal"):
+
+    # Check against blocked hostnames
+    if hostname in _BLOCKED_HOSTNAMES:
         raise ValueError(
-            f"{field_name}: cloud metadata endpoints are not allowed"
+            f"{field_name}: blocked destination '{hostname}' (cloud metadata / loopback)"
         )
-    if hostname.startswith("169.254."):
-        raise ValueError(f"{field_name}: link-local addresses are not allowed")
+
+    # Try to parse hostname as an IP address and check CIDR ranges
+    try:
+        addr = ipaddress.ip_address(hostname)
+    except ValueError:
+        # Not an IP literal — try DNS resolution for known dangerous names
+        # (already checked _BLOCKED_HOSTNAMES above)
+        return
+
+    for network in _BLOCKED_NETWORKS:
+        if addr in network:
+            raise ValueError(
+                f"{field_name}: blocked IP address {addr} falls in {network}"
+            )
+
+    for network in _PRIVATE_NETWORKS:
+        if addr in network:
+            logger.warning(
+                "private_network_url",
+                field=field_name,
+                address=str(addr),
+                network=str(network),
+            )
+            break
 
 
 def sanitize_url(url: str) -> str:

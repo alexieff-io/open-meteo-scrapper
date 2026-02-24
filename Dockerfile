@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12.8-slim
 
 LABEL maintainer="weather-scraper"
 LABEL description="Weather data scraper collecting from Open-Meteo and exporting to Victoria Metrics"

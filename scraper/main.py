@@ -11,10 +11,12 @@ import time
 import structlog
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
+from collections.abc import Awaitable, Callable
+
 from scraper.collector import OpenMeteoCollector
 from scraper.config import AppConfig, load_config, log_config
 from scraper.exporter import VictoriaMetricsExporter
-from scraper.models import Location
+from scraper.models import Location, MetricPoint
 
 SCRAPE_DURATION = Histogram(
     "weather_scrape_duration_seconds",
@@ -148,7 +150,7 @@ class WeatherScraper:
     async def _run_scrape_cycle(
         self,
         scrape_type: str,
-        collect_fn: object,
+        collect_fn: Callable[[Location], Awaitable[list[MetricPoint]]],
     ) -> None:
         """Execute a single scrape cycle across all locations.
 
@@ -158,16 +160,22 @@ class WeatherScraper:
         """
         self._logger.info("scrape_cycle_start", scrape_type=scrape_type, locations=len(self._locations))
         cycle_start = time.monotonic()
-        all_metrics = []
+        all_metrics: list[MetricPoint] = []
 
-        async def _collect_with_limit(loc: Location) -> list:
+        async def _collect_with_limit(loc: Location) -> tuple[list[MetricPoint] | Exception, float]:
             async with self._scrape_semaphore:
-                return await collect_fn(loc)
+                start = time.monotonic()
+                try:
+                    result = await collect_fn(loc)
+                    return result, time.monotonic() - start
+                except Exception as exc:
+                    return exc, time.monotonic() - start
 
         tasks = [_collect_with_limit(loc) for loc in self._locations]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks)
 
-        for loc, result in zip(self._locations, results):
+        for loc, (result, duration) in zip(self._locations, results):
+            SCRAPE_DURATION.labels(scrape_type=scrape_type, location=loc.name).observe(duration)
             if isinstance(result, Exception):
                 SCRAPE_ERRORS.labels(scrape_type=scrape_type, location=loc.name).inc()
                 self._logger.error(
@@ -175,10 +183,9 @@ class WeatherScraper:
                     scrape_type=scrape_type,
                     location=loc.name,
                     error=str(result),
+                    duration_seconds=round(duration, 3),
                 )
             else:
-                duration = time.monotonic() - cycle_start
-                SCRAPE_DURATION.labels(scrape_type=scrape_type, location=loc.name).observe(duration)
                 all_metrics.extend(result)
 
         if all_metrics:
@@ -194,12 +201,12 @@ class WeatherScraper:
                 )
 
         LAST_SCRAPE_TIMESTAMP.labels(scrape_type=scrape_type).set_to_current_time()
-        duration = time.monotonic() - cycle_start
+        cycle_duration = time.monotonic() - cycle_start
         self._logger.info(
             "scrape_cycle_complete",
             scrape_type=scrape_type,
             metrics_collected=len(all_metrics),
-            duration_seconds=round(duration, 3),
+            duration_seconds=round(cycle_duration, 3),
         )
 
     async def _interruptible_sleep(self, seconds: int) -> None:
@@ -212,6 +219,19 @@ class WeatherScraper:
         """Signal handler for graceful shutdown."""
         self._logger.info("shutdown_signal_received", signal=sig.name)
         self._running = False
+
+    async def _safe_shutdown(self) -> None:
+        """Close all resources safely, ensuring each gets a chance to close."""
+        for name, resource in [
+            ("collector", self._collector),
+            ("exporter", self._exporter),
+        ]:
+            try:
+                await asyncio.wait_for(resource.close(), timeout=10.0)
+            except asyncio.TimeoutError:
+                self._logger.error("shutdown_timeout", resource=name)
+            except Exception:
+                self._logger.exception("shutdown_error", resource=name)
 
     async def run_backfill(self, past_days: int) -> None:
         """Run a single backfill cycle for historical data, then exit.
@@ -250,8 +270,7 @@ class WeatherScraper:
 
             self._logger.info("backfill_complete", past_days=past_days)
         finally:
-            await self._collector.close()
-            await self._exporter.close()
+            await self._safe_shutdown()
 
     async def run(self) -> None:
         """Start all scrape loops and the Prometheus metrics server."""
@@ -281,8 +300,7 @@ class WeatherScraper:
             self._logger.exception("unexpected_scraper_error")
         finally:
             self._logger.info("shutting_down")
-            await self._collector.close()
-            await self._exporter.close()
+            await self._safe_shutdown()
             self._logger.info("shutdown_complete")
 
 
