@@ -54,6 +54,11 @@ def validate(rows):
                     for row in rows if row['host'] in BAD_HOSTS))
 
 
+def valid_at(window, now):
+    return (datetime.datetime.fromisoformat(window['notBefore']) <= now
+            < datetime.datetime.fromisoformat(window['notAfter']))
+
+
 def chain_fingerprints(output):
     certificates = re.findall(r'-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----',
                               output, re.DOTALL)
@@ -80,7 +85,8 @@ async def identify_chain(host):
 async def probe():
     import aiohttp
     expected_chains = json.loads(Path(__file__).with_name("chain-fingerprints.json").read_text())
-    if set(expected_chains) != set(BAD_HOSTS):
+    windows = json.loads(Path(__file__).with_name("chain-validity.json").read_text())
+    if set(expected_chains) != set(BAD_HOSTS) or set(windows) != set(BAD_HOSTS):
         raise ValueError("Pinned chain cohort must match all 14 hosts")
     gate = asyncio.Semaphore(4)
     # Same default verification as scraper.collector and scraper.exporter.
@@ -90,6 +96,8 @@ async def probe():
             async with gate:
                 identity = {}
                 if host in BAD_HOSTS:
+                    if not valid_at(windows[host], datetime.datetime.now(datetime.timezone.utc)):
+                        return {'host': host, 'result': 'inconclusive', 'reason': 'pinned-chain-outside-validity'}
                     observed = await identify_chain(host)
                     identity = {'chainSha256': observed,
                                 'chainMatchesArchive': observed == expected_chains[host]}

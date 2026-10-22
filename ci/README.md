@@ -24,7 +24,11 @@ DER certificate fingerprints in `chain-fingerprints.json`. For each bad host,
 a diagnostic OpenSSL handshake captures the complete served chain (no HTTP or
 application data); every certificate must match those pinned fingerprints before
 aiohttp's issuer rejection can count. Missing, added, or rotated certificates
-fail closed. This diagnostic capture is not itself a trust result. The following
+fail closed. Pinned leaf hostnames were independently checked against their
+certificates; the per-host validity window in `chain-validity.json` is the
+intersection of all certificate validity intervals in that complete chain.
+The probe checks that window explicitly, since issuer errors can otherwise mask
+expired/not-yet-valid certificates. This diagnostic capture is not itself a trust result. The following
 aiohttp request always retains default verification.
 
 These are live handshake tests with pinned chain identity, not offline archive

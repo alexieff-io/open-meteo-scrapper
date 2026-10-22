@@ -1,10 +1,11 @@
 """Offline regression tests for the live image qualification's fail-closed rules."""
+import datetime
 import json
 from pathlib import Path
 import ssl
 
 import pytest
-from ci.tls_probe import BAD_HOSTS, GOOD_HOSTS, classify, validate
+from ci.tls_probe import BAD_HOSTS, GOOD_HOSTS, classify, validate, valid_at
 
 
 def test_exact_public_cohort():
@@ -74,3 +75,21 @@ def test_pinned_complete_chain_inventory():
         assert len(fingerprints) == (2 if '-aaa-' in host else 3)
         assert all(len(value) == 64 and set(value) <= set('0123456789abcdef')
                    for value in fingerprints)
+
+
+def test_validity_guard_does_not_let_issuer_failure_mask_expiry():
+    window = {'notBefore': '2026-10-20T00:00:00+00:00',
+              'notAfter': '2027-05-03T00:00:00+00:00'}
+    def date(value):
+        return datetime.datetime.fromisoformat(value + 'T00:00:00+00:00')
+    assert valid_at(window, date('2026-10-22'))
+    assert not valid_at(window, date('2026-10-19'))
+    assert not valid_at(window, date('2027-05-03'))
+    assert not valid_at(window, date('2030-01-01'))
+
+
+def test_pinned_validity_inventory():
+    windows = json.loads(Path('ci/chain-validity.json').read_text())
+    assert set(windows) == set(BAD_HOSTS)
+    for window in windows.values():
+        assert datetime.datetime.fromisoformat(window['notBefore']) < datetime.datetime.fromisoformat(window['notAfter'])
