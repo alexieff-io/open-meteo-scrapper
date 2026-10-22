@@ -1,0 +1,3 @@
+# aioresponses 0.7.9 does not implement aiohttp 3.14's stream_writer argument.
+# Test doubles only: production requirements and image resolution stay unchanged.
+aiohttp<3.14

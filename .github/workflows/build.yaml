@@ -30,13 +30,45 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -e ".[test]"
+        run: pip install -c ci/test-constraints.txt -e ".[test]"
 
       - name: Run tests with coverage
         run: pytest --cov=scraper --cov-fail-under=80 -v
 
-  build:
+  qualify-image:
     needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Build and qualify native runtime (no push or login)
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: bash ci/qualify-image.sh
+      - name: Preserve runtime trust evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tls-qualification-${{ matrix.arch }}
+          path: build/tls/
+          if-no-files-found: error
+          retention-days: 14
+
+  build:
+    needs: [test, qualify-image]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -81,6 +113,8 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
+          # Re-run the in-image live trust gate before any push.
+          no-cache: true
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -145,3 +179,4 @@ jobs:
         run: |
           cosign login ghcr.io -u ${{ github.actor }} -p "$GITHUB_TOKEN"
           cosign sign --yes ghcr.io/${{ github.repository_owner }}/charts/weather-scraper@${{ steps.helm-push.outputs.digest }}
+
