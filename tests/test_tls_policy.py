@@ -2,10 +2,12 @@
 import datetime
 import json
 from pathlib import Path
+import socket
 import ssl
 
 import pytest
-from ci.tls_probe import BAD_HOSTS, GOOD_HOSTS, classify, validate, valid_at
+from ci.tls_probe import (BAD_HOSTS, GOOD_HOSTS, MAX_ATTEMPTS, RETRY_DELAYS, classify,
+                          retryable, validate, valid_at, with_retries)
 
 
 def test_exact_public_cohort():
@@ -93,3 +95,105 @@ def test_pinned_validity_inventory():
     assert set(windows) == set(BAD_HOSTS)
     for window in windows.values():
         assert datetime.datetime.fromisoformat(window['notBefore']) < datetime.datetime.fromisoformat(window['notAfter'])
+
+
+def wrapped(cause, outer=None):
+    outer = outer or Exception('request failed')
+    outer.__cause__ = cause
+    return outer
+
+
+@pytest.mark.parametrize('error', [TimeoutError(), ConnectionResetError(),
+                                   wrapped(socket.gaierror(-2, 'Name or service not known'))])
+def test_transport_failures_are_marked(error):
+    assert classify(error) == {'result': 'inconclusive', 'errorType': type(error).__name__, 'transport': True}
+
+
+@pytest.mark.parametrize('error', [wrapped(ssl.SSLError(1, 'sslv3 alert handshake failure'), OSError('connect failed')),
+                                   ValueError('certificate verify failed'), Exception('server disconnected')])
+def test_tls_layer_and_unknown_failures_are_not_transport(error):
+    assert classify(error)['transport'] is False
+
+
+CHAIN = ['a' * 64, 'b' * 64]
+TIMEOUT = {'result': 'inconclusive', 'errorType': 'TimeoutError', 'transport': True}
+
+
+@pytest.mark.parametrize('row', [
+    TIMEOUT,
+    {'result': 'inconclusive', 'chainSha256': [], 'chainMatchesArchive': False},
+    {**TIMEOUT, 'chainSha256': CHAIN, 'chainMatchesArchive': True},
+], ids=['timeout', 'no-chain-captured', 'get-timeout-after-chain-match'])
+def test_unproven_transport_attempts_are_retryable(row):
+    assert retryable(row)
+
+
+@pytest.mark.parametrize('row', [
+    {'result': 'accepted', 'status': 200},
+    {'result': 'certificate-rejected', 'verifyCode': 20, 'chainSha256': CHAIN, 'chainMatchesArchive': True},
+    {'result': 'inconclusive', 'verifyCode': 10},
+    {'result': 'inconclusive', 'verifyCode': 62},
+    {'result': 'inconclusive', 'chainSha256': CHAIN, 'chainMatchesArchive': False},
+    {'result': 'inconclusive', 'reason': 'pinned-chain-outside-validity'},
+    {'result': 'inconclusive', 'errorType': 'OSError', 'transport': False},
+], ids=['accepted', 'rejected', 'expired', 'hostname', 'chain-mismatch', 'validity-window', 'tls-layer'])
+def test_verdicts_and_identity_failures_are_final(row):
+    assert not retryable(row)
+
+
+def scripted(*rows):
+    calls = []
+    async def attempt(host):
+        calls.append(host)
+        return {'host': host, **rows[len(calls) - 1]}
+    return attempt, calls
+
+
+def recorder():
+    delays = []
+    async def sleep(seconds):
+        delays.append(seconds)
+    return sleep, delays
+
+
+@pytest.mark.parametrize('host, verdict', [(BAD_HOSTS[0], 'accepted'), (GOOD_HOSTS[0], 'certificate-rejected')])
+async def test_wrong_verdict_is_never_retried(host, verdict):
+    attempt, calls = scripted({'result': verdict}, {'result': 'unused'})
+    sleep, delays = recorder()
+    row = await with_retries(attempt, host, sleep)
+    assert (row['result'], row['attempts'], calls, delays) == (verdict, 1, [host], [])
+    assert 'retried' not in row
+
+
+async def test_transport_failure_is_retried_on_a_fresh_attempt():
+    host = GOOD_HOSTS[1]
+    attempt, _ = scripted(TIMEOUT, {'result': 'accepted', 'status': 400})
+    sleep, delays = recorder()
+    row = await with_retries(attempt, host, sleep)
+    assert row == {'host': host, 'result': 'accepted', 'status': 400, 'attempts': 2, 'retried': [TIMEOUT]}
+    assert delays == [RETRY_DELAYS[0]]
+
+
+async def test_final_row_comes_from_one_attempt():
+    host = BAD_HOSTS[0]
+    mismatch = {'result': 'inconclusive', 'chainSha256': ['c' * 64], 'chainMatchesArchive': False}
+    attempt, calls = scripted({**TIMEOUT, 'chainSha256': CHAIN, 'chainMatchesArchive': True}, mismatch, {'result': 'unused'})
+    sleep, _ = recorder()
+    row = await with_retries(attempt, host, sleep)
+    assert {k: v for k, v in row.items() if k != 'retried'} == {'host': host, **mismatch, 'attempts': 2}
+    assert len(calls) == 2
+
+
+async def test_persistent_transport_failure_still_fails_the_gate():
+    host = GOOD_HOSTS[1]
+    attempt, calls = scripted(*[TIMEOUT] * (MAX_ATTEMPTS + 1))
+    sleep, delays = recorder()
+    row = await with_retries(attempt, host, sleep)
+    assert (row['result'], row['attempts'], len(row['retried']), len(calls)) == (
+        'inconclusive', MAX_ATTEMPTS, MAX_ATTEMPTS - 1, MAX_ATTEMPTS)
+    assert delays == list(RETRY_DELAYS)
+    assert not validate([row if r['host'] == host else r for r in good_receipt()])
+
+
+def test_receipt_with_retry_evidence_still_validates():
+    assert validate([{**row, 'attempts': 2, 'retried': [TIMEOUT], 'seconds': 1.5} for row in good_receipt()])
