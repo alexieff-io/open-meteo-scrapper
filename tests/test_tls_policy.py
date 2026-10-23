@@ -8,7 +8,9 @@ import ssl
 
 import aiohttp
 from aiohttp.http_exceptions import BadHttpMessage, HttpProcessingError
+from multidict import CIMultiDict, CIMultiDictProxy
 import pytest
+from yarl import URL
 from ci.tls_probe import (BAD_HOSTS, GOOD_HOSTS, MAX_ATTEMPTS, RETRY_DELAYS, classify,
                           retryable, unparseable_response, validate, valid_at, with_retries)
 
@@ -118,11 +120,13 @@ def test_tls_layer_and_unknown_failures_are_not_transport(error):
     assert classify(error)['transport'] is False
 
 
-def parser_failure(kind=aiohttp.ClientResponseError):
+def parser_failure(kind=aiohttp.ClientResponseError, method='GET'):
     # Shaped like aiohttp's ClientResponse.start(): the parser's error, copied, then wrapped.
     copied = HttpProcessingError(code=400, message='Too many headers received')
     copied.__cause__ = BadHttpMessage('Too many headers received')
-    error = kind(None, (), status=400, message='Too many headers received')
+    url = URL('https://' + GOOD_HOSTS[0] + '/')
+    info = aiohttp.RequestInfo(url, method, CIMultiDictProxy(CIMultiDict()), url)
+    error = kind(info, (), status=400, message='Too many headers received')
     error.__cause__ = copied
     return error
 
@@ -150,14 +154,34 @@ async def test_real_aiohttp_parse_failure_is_recognised():
     assert len(row['httpParseError']) <= 200
 
 
+async def test_real_proxy_connect_parse_failure_proves_nothing():
+    # A proxy's reply to CONNECT goes through the same ClientResponse.start(), but before any
+    # TLS handshake with the host, so a garbled one must not count as accepted.
+    async def respond(reader, writer):
+        await reader.readuntil(b'\r\n\r\n')
+        writer.write(b'HTTP/1.1 200 OK\r\nX-Big: ' + b'a' * 9000 + b'\r\n\r\n')
+        await writer.drain()
+        writer.close()
+    server = await asyncio.start_server(respond, '127.0.0.1', 0)
+    port = server.sockets[0].getsockname()[1]
+    async with server, aiohttp.ClientSession() as session:
+        with pytest.raises(aiohttp.ClientResponseError) as caught:
+            async with session.get('https://' + GOOD_HOSTS[0] + '/', proxy=f'http://127.0.0.1:{port}'):
+                pass
+    assert type(caught.value) is aiohttp.ClientResponseError
+    assert caught.value.request_info.method == 'CONNECT'
+    assert unparseable_response(caught.value) is None
+
+
 @pytest.mark.parametrize('error', [
     aiohttp.ClientResponseError(None, (), status=503, message='Service Unavailable'),
     parser_failure(aiohttp.TooManyRedirects),
     parser_failure(aiohttp.ClientHttpProxyError),
     parser_failure(aiohttp.ContentTypeError),
     parser_failure(aiohttp.WSServerHandshakeError),
+    parser_failure(method='CONNECT'),
     parser_failure().__cause__,
-], ids=['no-parser-cause', 'redirects', 'proxy', 'content-type', 'websocket', 'unwrapped'])
+], ids=['no-parser-cause', 'redirects', 'proxy', 'content-type', 'websocket', 'proxy-connect', 'unwrapped'])
 def test_other_http_errors_prove_nothing(error):
     assert unparseable_response(error) is None
     assert classify(error) == {'result': 'inconclusive', 'errorType': type(error).__name__, 'transport': False}
