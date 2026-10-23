@@ -1,13 +1,16 @@
 """Offline regression tests for the live image qualification's fail-closed rules."""
+import asyncio
 import datetime
 import json
 from pathlib import Path
 import socket
 import ssl
 
+import aiohttp
+from aiohttp.http_exceptions import BadHttpMessage, HttpProcessingError
 import pytest
 from ci.tls_probe import (BAD_HOSTS, GOOD_HOSTS, MAX_ATTEMPTS, RETRY_DELAYS, classify,
-                          retryable, validate, valid_at, with_retries)
+                          retryable, unparseable_response, validate, valid_at, with_retries)
 
 
 def test_exact_public_cohort():
@@ -115,6 +118,60 @@ def test_tls_layer_and_unknown_failures_are_not_transport(error):
     assert classify(error)['transport'] is False
 
 
+def parser_failure(kind=aiohttp.ClientResponseError):
+    # Shaped like aiohttp's ClientResponse.start(): the parser's error, copied, then wrapped.
+    copied = HttpProcessingError(code=400, message='Too many headers received')
+    copied.__cause__ = BadHttpMessage('Too many headers received')
+    error = kind(None, (), status=400, message='Too many headers received')
+    error.__cause__ = copied
+    return error
+
+
+def test_unparseable_response_proves_the_handshake():
+    assert unparseable_response(parser_failure()) == {
+        'result': 'accepted', 'httpParseError': 'BadHttpMessage: Too many headers received'}
+
+
+async def test_real_aiohttp_parse_failure_is_recognised():
+    # Plain HTTP on loopback: ClientResponse.start() raises the same way after a TLS handshake.
+    async def respond(reader, writer):
+        await reader.readuntil(b'\r\n\r\n')
+        writer.write(b'HTTP/1.1 200 OK\r\nX-Big: ' + b'a' * 9000 + b'\r\n\r\n')
+        await writer.drain()
+        writer.close()
+    server = await asyncio.start_server(respond, '127.0.0.1', 0)
+    port = server.sockets[0].getsockname()[1]
+    async with server, aiohttp.ClientSession() as session:
+        with pytest.raises(aiohttp.ClientResponseError) as caught:
+            async with session.get(f'http://127.0.0.1:{port}/'):
+                pass
+    row = unparseable_response(caught.value)
+    assert row['result'] == 'accepted' and row['httpParseError'].startswith('LineTooLong: ')
+    assert len(row['httpParseError']) <= 200
+
+
+@pytest.mark.parametrize('error', [
+    aiohttp.ClientResponseError(None, (), status=503, message='Service Unavailable'),
+    parser_failure(aiohttp.TooManyRedirects),
+    parser_failure(aiohttp.ClientHttpProxyError),
+    parser_failure(aiohttp.ContentTypeError),
+    parser_failure(aiohttp.WSServerHandshakeError),
+    parser_failure().__cause__,
+], ids=['no-parser-cause', 'redirects', 'proxy', 'content-type', 'websocket', 'unwrapped'])
+def test_other_http_errors_prove_nothing(error):
+    assert unparseable_response(error) is None
+    assert classify(error) == {'result': 'inconclusive', 'errorType': type(error).__name__, 'transport': False}
+
+
+def test_unparseable_response_passes_a_control_but_fails_a_distrusted_chain():
+    evidence = unparseable_response(parser_failure())
+    rows = good_receipt()
+    rows[0] = {'host': rows[0]['host'], **evidence}
+    assert validate(rows)
+    rows[-1] = {'host': rows[-1]['host'], **evidence, 'chainMatchesArchive': True}
+    assert not validate(rows)
+
+
 CHAIN = ['a' * 64, 'b' * 64]
 TIMEOUT = {'result': 'inconclusive', 'errorType': 'TimeoutError', 'transport': True}
 
@@ -136,7 +193,9 @@ def test_unproven_transport_attempts_are_retryable(row):
     {'result': 'inconclusive', 'chainSha256': CHAIN, 'chainMatchesArchive': False},
     {'result': 'inconclusive', 'reason': 'pinned-chain-outside-validity'},
     {'result': 'inconclusive', 'errorType': 'OSError', 'transport': False},
-], ids=['accepted', 'rejected', 'expired', 'hostname', 'chain-mismatch', 'validity-window', 'tls-layer'])
+    {'result': 'accepted', 'httpParseError': 'LineTooLong: Got more than 8190 bytes'},
+], ids=['accepted', 'rejected', 'expired', 'hostname', 'chain-mismatch', 'validity-window', 'tls-layer',
+        'unparseable-response'])
 def test_verdicts_and_identity_failures_are_final(row):
     assert not retryable(row)
 

@@ -2,6 +2,8 @@
 
 Only issuer-chain verification failures prove rejection. Expiry, hostname,
 DNS, timeouts, and other errors fail the gate rather than masquerading as distrust.
+A response aiohttp read but could not parse proves the handshake accepted the chain,
+so it counts as accepted: it passes a control host and fails an eMudhra host.
 Transport failures alone get a fresh attempt (MAX_ATTEMPTS in all) and still fail
 the gate if they persist; any verdict or identity failure is final.
 The endpoints are public live peers, not pinned certificate archive fixtures.
@@ -54,6 +56,18 @@ def classify(error):
     # so any TLS-layer error anywhere in the chain keeps the attempt final.
     return {'result': 'inconclusive', 'errorType': type(error).__name__,
             'transport': network and not tls}
+
+
+def unparseable_response(error):
+    # aiohttp raises exactly ClientResponseError from a parser error only in ClientResponse.start(),
+    # on bytes read over the verified connection. Its subclasses and raise_for_status() never match.
+    from aiohttp import ClientResponseError
+    from aiohttp.http_exceptions import HttpProcessingError
+    if type(error) is not ClientResponseError or not isinstance(error.__cause__, HttpProcessingError):
+        return None
+    # The 400 is aiohttp's own code, not the server's, so record the parser's error instead.
+    root = error.__cause__.__cause__ or error.__cause__
+    return {'result': 'accepted', 'httpParseError': f'{type(root).__name__}: {error.message}'[:200]}
 
 
 def retryable(row):
@@ -138,7 +152,7 @@ async def probe():
                 async with session.get('https://' + host + '/', allow_redirects=False) as response:
                     return {'host': host, 'result': 'accepted', 'status': response.status, **identity}
             except Exception as error:
-                return {'host': host, **classify(error), **identity}
+                return {'host': host, **(unparseable_response(error) or classify(error)), **identity}
 
         async def attempt(host):
             async with gate:
