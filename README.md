@@ -33,7 +33,7 @@ For a one-shot load of historical data, see [BACKFILL.md](BACKFILL.md).
 - Existing Victoria Metrics deployment
 - Existing Grafana deployment
 - Self-hosted Open-Meteo instance
-- Helm 3.x
+- Helm 3.8+ (for `oci://` charts)
 - Docker (for building the image)
 
 ## Quick Start
@@ -59,7 +59,12 @@ The GitHub Actions workflow builds multi-arch images (amd64/arm64) and pushes th
 ### Install with Helm
 
 ```bash
-# Minimum required values
+# From the published chart (latest release; add --version <version> to pin one)
+helm install weather-scraper oci://ghcr.io/alexieff-io/charts/weather-scraper \
+  --set openMeteo.url=http://your-open-meteo:8080 \
+  --set victoriaMetrics.url=http://your-victoria-metrics:8428
+
+# From a checkout of this repository, with the minimum required values
 helm install weather-scraper ./helm/weather-scraper \
   --set openMeteo.url=http://your-open-meteo:8080 \
   --set victoriaMetrics.url=http://your-victoria-metrics:8428
