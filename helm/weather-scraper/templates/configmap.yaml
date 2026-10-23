@@ -14,6 +14,7 @@ data:
       url: {{ .Values.victoriaMetrics.url | quote }}
       import_endpoint: {{ .Values.victoriaMetrics.importEndpoint | quote }}
       batch_size: {{ .Values.victoriaMetrics.batchSize }}
+      request_timeout: {{ .Values.victoriaMetrics.requestTimeout }}
 
     logging:
       level: {{ .Values.logging.level | quote }}
@@ -34,6 +35,7 @@ data:
     {{- end }}
 
     scrape:
+      max_concurrent_locations: {{ .Values.scrape.maxConcurrentLocations }}
       current_weather_interval: {{ .Values.scrape.currentWeatherInterval }}
       hourly_forecast_interval: {{ .Values.scrape.hourlyForecastInterval }}
       daily_forecast_interval: {{ .Values.scrape.dailyForecastInterval }}

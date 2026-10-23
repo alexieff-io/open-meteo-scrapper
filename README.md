@@ -97,8 +97,10 @@ curl -s http://localhost:9090/metrics
 | `victoriaMetrics.url` | Victoria Metrics base URL | `http://victoria-metrics-...:8428` |
 | `victoriaMetrics.importEndpoint` | VM import API path | `/api/v1/import/prometheus` |
 | `victoriaMetrics.batchSize` | Metrics per export batch | `1000` |
+| `victoriaMetrics.requestTimeout` | Victoria Metrics export request timeout (seconds) | `30` |
 | `logging.level` | Log level (debug/info/warning/error) | `info` |
 | `logging.format` | Log format (json/console) | `json` |
+| `scrape.maxConcurrentLocations` | Maximum locations scraped concurrently | `10` |
 | `scrape.currentWeatherInterval` | Current weather scrape interval (s) | `300` |
 | `scrape.hourlyForecastInterval` | Hourly forecast scrape interval (s) | `3600` |
 | `scrape.dailyForecastInterval` | Daily forecast scrape interval (s) | `21600` |
@@ -170,7 +172,7 @@ These environment variables override their corresponding config file values:
 | `LOG_FORMAT` | `logging.format` |
 | `CONFIG_PATH` | Path to config YAML file |
 
-Two settings have no Helm value: `scrape.max_concurrent_locations` (config file only, default `10`) and `victoria_metrics.request_timeout` (default `30` seconds; with Helm, set `VM_REQUEST_TIMEOUT` through `extraEnv`). See [config.yml.example](config.yml.example) for every config file key.
+With Helm, `VM_REQUEST_TIMEOUT` set through `extraEnv` still overrides `victoriaMetrics.requestTimeout`. See [config.yml.example](config.yml.example) for every config file key.
 
 ## Grafana Dashboards
 
