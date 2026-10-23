@@ -31,10 +31,18 @@
           "type": "grafana",
           "uid": "-- Grafana --"
         },
-        "editable": true,
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 37,
+  "id": null,
   "links": [],
   "panels": [
     {
