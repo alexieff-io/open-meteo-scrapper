@@ -45,6 +45,7 @@ victoriaMetrics:
   url: "http://victoria-metrics-victoria-metrics-single-server:8428"
   importEndpoint: "/api/v1/import/prometheus"
   batchSize: 1000
+  requestTimeout: 30
 
 # -- Existing Open-Meteo connection
 openMeteo:
@@ -89,6 +90,7 @@ locations:
 
 # -- Scrape intervals and variables
 scrape:
+  maxConcurrentLocations: 10
   currentWeatherInterval: 300
   hourlyForecastInterval: 3600
   dailyForecastInterval: 21600
