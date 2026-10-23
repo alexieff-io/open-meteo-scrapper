@@ -2,5 +2,5 @@ apiVersion: v2
 name: weather-scraper
 description: Weather data scraper collecting from Open-Meteo and exporting to Victoria Metrics
 type: application
-version: 0.1.0
-appVersion: "1.0.0"
+version: 0.1.13
+appVersion: "0.1.13"
