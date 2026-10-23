@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/OWNER/weather-scraper
+  repository: ghcr.io/alexieff-io/open-meteo-scrapper
   pullPolicy: IfNotPresent
   tag: ""
 
