@@ -8,9 +8,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && test "$(dpkg-query -W -f='${Version}' ca-certificates)" = 20250419~deb12u2
 
+# No static version label: CI stamps org.opencontainers.image.version from the git ref.
 LABEL maintainer="weather-scraper"
 LABEL description="Weather data scraper collecting from Open-Meteo and exporting to Victoria Metrics"
-LABEL version="1.0.0"
 
 RUN groupadd -g 1000 scraper && \
     useradd -r -u 1000 -g scraper scraper
