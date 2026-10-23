@@ -48,8 +48,8 @@ The GitHub Actions workflow automatically builds multi-arch images (amd64/arm64)
 
 ```bash
 # Image is available at:
-# ghcr.io/<owner>/weather-scraper:latest   (from main branch)
-# ghcr.io/<owner>/weather-scraper:1.0.0    (from v1.0.0 tag)
+# ghcr.io/alexieff-io/open-meteo-scrapper:main     (from main branch)
+# ghcr.io/alexieff-io/open-meteo-scrapper:1.0.0    (from v1.0.0 tag; latest tracks the newest version tag)
 ```
 
 ### Install with Helm
@@ -86,7 +86,7 @@ curl -s http://localhost:9090/metrics
 | Parameter | Description | Default |
 |---|---|---|
 | `replicaCount` | Number of replicas | `1` |
-| `image.repository` | Container image repository | `ghcr.io/OWNER/weather-scraper` |
+| `image.repository` | Container image repository | `ghcr.io/alexieff-io/open-meteo-scrapper` |
 | `image.tag` | Image tag (defaults to appVersion) | `""` |
 | `openMeteo.url` | Open-Meteo base URL | `http://open-meteo:8080` |
 | `openMeteo.requestTimeout` | HTTP request timeout (seconds) | `30` |
