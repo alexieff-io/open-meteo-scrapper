@@ -2,6 +2,7 @@
 
 Only issuer-chain verification failures prove rejection. Expiry, hostname,
 DNS, timeouts, and other errors fail the gate rather than masquerading as distrust.
+A response aiohttp cannot parse still proves the handshake completed, so it counts as accepted.
 Transport failures alone get a fresh attempt (MAX_ATTEMPTS in all) and still fail
 the gate if they persist; any verdict or identity failure is final.
 The endpoints are public live peers, not pinned certificate archive fixtures.
@@ -33,7 +34,25 @@ MAX_ATTEMPTS = 3
 RETRY_DELAYS = (2, 5)
 
 
+def parse_failure(error):
+    # aiohttp raises ClientResponseError from HttpProcessingError when its parser rejects
+    # response bytes, which over https:// with default verification means the handshake
+    # completed. HTTP status is already irrelevant; the CONNECT check excludes a proxy's reply.
+    from aiohttp import ClientResponseError
+    from aiohttp.http_exceptions import HttpProcessingError
+    if not (isinstance(error, ClientResponseError) and error.request_info.method == 'GET'
+            and isinstance(error.__cause__, HttpProcessingError)):
+        return None
+    cause = error.__cause__
+    while cause.__cause__ is not None:
+        cause = cause.__cause__
+    # The status is aiohttp's synthetic 400, not the server's, so only the parser error is kept.
+    return f"{type(cause).__name__}: {' '.join(error.message.split())[:200]}"
+
+
 def classify(error):
+    if detail := parse_failure(error):
+        return {'result': 'accepted', 'httpError': detail}
     pending, seen = [error], set()
     network = tls = False
     while pending and len(seen) < 32:

@@ -11,7 +11,10 @@ Both native AMD64 and ARM64 CI jobs build the image, then run its installed
 aiohttp as the existing non-root user with no scraper startup, application data,
 credentials, or TLS overrides. All 14 eMudhra/emSign test hosts must fail with an
 issuer-chain verification error, while Cloudflare and Open-Meteo must complete
-TLS. HTTP status is irrelevant to the TLS control. Expiry and hostname failures
+TLS. HTTP status is irrelevant to the TLS control, and so is a response aiohttp
+cannot parse (an oversized or malformed header block, say): it proves the
+handshake completed, so it counts as accepted with the parser error recorded,
+and on an eMudhra host it fails CI. Expiry and hostname failures
 are inconclusive and fail CI; DNS and network failures are inconclusive and fail
 CI if they persist. Because a single live connection can stall (seen once in an
 emulated ARM64 build), transport-only failures get a fresh attempt: a timeout,

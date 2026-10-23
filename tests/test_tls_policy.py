@@ -1,11 +1,16 @@
 """Offline regression tests for the live image qualification's fail-closed rules."""
+import asyncio
 import datetime
 import json
 from pathlib import Path
 import socket
 import ssl
 
+import aiohttp
+from aiohttp.http_exceptions import HttpProcessingError
+from multidict import CIMultiDict, CIMultiDictProxy
 import pytest
+from yarl import URL
 from ci.tls_probe import (BAD_HOSTS, GOOD_HOSTS, MAX_ATTEMPTS, RETRY_DELAYS, classify,
                           retryable, validate, valid_at, with_retries)
 
@@ -197,3 +202,71 @@ async def test_persistent_transport_failure_still_fails_the_gate():
 
 def test_receipt_with_retry_evidence_still_validates():
     assert validate([{**row, 'attempts': 2, 'retried': [TIMEOUT], 'seconds': 1.5} for row in good_receipt()])
+
+
+MALFORMED = {
+    'oversized-header': (b'HTTP/1.1 200 OK\r\nX-Big: ' + b'a' * 9000 + b'\r\nContent-Length: 0\r\n\r\n',
+                         'LineTooLong'),
+    'too-many-headers': (b'HTTP/1.1 200 OK\r\n' + b''.join(b'X-%d: v\r\n' % i for i in range(129))
+                         + b'Content-Length: 0\r\n\r\n', 'BadHttpMessage'),
+    'bad-status-line': (b'HTTP/1.1 2x0 OK\r\nContent-Length: 0\r\n\r\n', 'BadStatusLine'),
+}
+
+
+async def response_error(raw):
+    # The installed aiohttp client reading a malformed response from a local server.
+    async def reply(reader, writer):
+        await reader.readuntil(b'\r\n\r\n')
+        writer.write(raw)
+        await writer.drain()
+        writer.close()
+    server = await asyncio.start_server(reply, '127.0.0.1', 0)
+    try:
+        async with aiohttp.ClientSession() as session:
+            with pytest.raises(aiohttp.ClientResponseError) as caught:
+                async with session.get(f'http://127.0.0.1:{server.sockets[0].getsockname()[1]}/'):
+                    pass
+        return caught.value
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+@pytest.mark.parametrize('raw, parser_error', MALFORMED.values(), ids=MALFORMED)
+async def test_unparseable_response_proves_the_handshake(raw, parser_error):
+    row = classify(await response_error(raw))
+    assert row['result'] == 'accepted' and 'status' not in row
+    assert row['httpError'].startswith(parser_error + ': ')
+    assert not retryable(row)
+
+
+def response_error_from(cause=None, method='GET'):
+    url = URL('https://' + GOOD_HOSTS[0] + '/')
+    error = aiohttp.ClientResponseError(aiohttp.RequestInfo(url, method, CIMultiDictProxy(CIMultiDict()), url),
+                                        (), status=400, message='Bad Request')
+    error.__cause__ = cause
+    return error
+
+
+@pytest.mark.parametrize('error', [response_error_from(),
+                                   response_error_from(HttpProcessingError(code=400, message='bad'), 'CONNECT')],
+                         ids=['status-without-parser-error', 'proxy-connect'])
+def test_other_response_errors_prove_nothing(error):
+    row = classify(error)
+    assert row == {'result': 'inconclusive', 'errorType': 'ClientResponseError', 'transport': False}
+    assert not retryable(row)
+
+
+PARSE_ERROR = {'result': 'accepted', 'httpError': 'LineTooLong: Got more than 8190 bytes when reading'}
+
+
+@pytest.mark.parametrize('host, identity, passes', [
+    (GOOD_HOSTS[0], {}, True),
+    (BAD_HOSTS[0], {'chainSha256': CHAIN, 'chainMatchesArchive': True}, False),
+], ids=['good-host', 'bad-host-trusted'])
+async def test_parse_error_verdict_is_final(host, identity, passes):
+    attempt, calls = scripted({**PARSE_ERROR, **identity}, {'result': 'unused'})
+    sleep, delays = recorder()
+    row = await with_retries(attempt, host, sleep)
+    assert (row, calls, delays) == ({'host': host, **PARSE_ERROR, **identity, 'attempts': 1}, [host], [])
+    assert validate([row if r['host'] == host else r for r in good_receipt()]) is passes
