@@ -40,11 +40,6 @@ def test_chart_copy_is_sidecar_format(name):
     assert '${DS_' not in json.dumps(dashboard)
 
 
-@pytest.mark.parametrize('name', [
-    pytest.param(name, marks=pytest.mark.xfail(
-        strict=True, reason='pre-existing drift: Feb 2026 fixes landed only in the chart copy'))
-    if name == 'migraine-weather.json' else name
-    for name in NAMES
-])
+@pytest.mark.parametrize('name', NAMES)
 def test_chart_copy_matches_source(name):
     assert without_import_fields(load(CHART_DIR / name)) == without_import_fields(load(SOURCE_DIR / name))
