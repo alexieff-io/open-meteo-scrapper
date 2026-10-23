@@ -11,8 +11,13 @@ Both native AMD64 and ARM64 CI jobs build the image, then run its installed
 aiohttp as the existing non-root user with no scraper startup, application data,
 credentials, or TLS overrides. All 14 eMudhra/emSign test hosts must fail with an
 issuer-chain verification error, while Cloudflare and Open-Meteo must complete
-TLS. HTTP status is irrelevant to the TLS control. Expiry and hostname failures
-are inconclusive and fail CI; DNS and network failures are inconclusive and fail
+TLS. HTTP status is irrelevant to the TLS control. So is a response to the
+probe's GET that aiohttp cannot parse, such as an oversized header: aiohttp only
+parses that response after verifying the connection, so the result counts as
+accepted and the receipt records the parse error. On an eMudhra host the same
+result fails CI, because a distrusted chain was accepted. A proxy's unparseable
+reply to CONNECT arrives before any handshake, so it proves nothing. Expiry and
+hostname failures are inconclusive and fail CI; DNS and network failures are inconclusive and fail
 CI if they persist. Because a single live connection can stall (seen once in an
 emulated ARM64 build), transport-only failures get a fresh attempt: a timeout,
 DNS or connection error with no TLS error anywhere in its exception
@@ -22,7 +27,8 @@ takes about 6 minutes at worst. Certificate verdicts, other TLS errors, chain
 mismatches and validity-window failures are final and never retried, and every
 host must still end with its expected result. The receipt records runtime,
 aiohttp version, CA package, bundle hash, source SHA, and local image identity,
-plus each host's attempts, elapsed seconds and any retried results.
+plus each host's attempts, elapsed seconds, any retried results and any HTTP
+parse error.
 
 The public endpoint cohort is documented by
 https://github.com/galadran/we-have-a-problem.com/tree/24ec06bbc38cedd378ded691610eb6dd4d9d3c6a
