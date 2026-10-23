@@ -21,9 +21,9 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
 data:
-  {{/* For sidecar-provisioned dashboards, the datasource variable ${DS_VICTORIAMETRICS}
-       is replaced with a type-only reference so Grafana auto-selects the default
-       Prometheus-compatible datasource. */}}
+  {{/* The chart's dashboards/ copies are embedded as-is. They are kept in sidecar format:
+       no import inputs, and type-only datasource references, so Grafana uses the
+       default Prometheus-compatible datasource instead of ${DS_VICTORIAMETRICS}. */}}
   {{ base $path }}: |-
     {{- $.Files.Get $path | nindent 4 }}
 {{- end }}

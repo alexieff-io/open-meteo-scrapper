@@ -6,6 +6,7 @@ victoria_metrics:
   url: "http://victoria-metrics:8428"
   import_endpoint: "/api/v1/import/prometheus"
   batch_size: 1000
+  request_timeout: 30
 
 logging:
   level: "info"
@@ -42,6 +43,7 @@ locations:
       region: "asia"
 
 scrape:
+  max_concurrent_locations: 10
   current_weather_interval: 300
   hourly_forecast_interval: 3600
   daily_forecast_interval: 21600

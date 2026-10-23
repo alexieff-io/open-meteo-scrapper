@@ -7,9 +7,10 @@ Weather Scraper has been deployed successfully!
    kubectl port-forward svc/{{ include "weather-scraper.fullname" . }} 9090:9090 -n {{ .Release.Namespace }}
    curl -s http://localhost:9090/metrics
 
-3. Verify data in Victoria Metrics:
-   kubectl port-forward svc/victoria-metrics 8428:8428 -n {{ .Release.Namespace }}
-   curl -s 'http://localhost:8428/api/v1/query?query=weather_temperature_celsius'
+3. Verify data in Victoria Metrics, from a pod inside the cluster:
+   {{- /* Drop any user:password from the URL so install output doesn't leak it. */}}
+   curl -s '{{ urlJoin (omit (urlParse .Values.victoriaMetrics.url) "userinfo") | trimSuffix "/" }}/api/v1/query?query=weather_temperature_celsius'
+   (Or port-forward your Victoria Metrics service and run the same query against localhost.)
 
 {{- if .Values.grafanaDashboards.enabled }}
 
