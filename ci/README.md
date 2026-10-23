@@ -11,9 +11,18 @@ Both native AMD64 and ARM64 CI jobs build the image, then run its installed
 aiohttp as the existing non-root user with no scraper startup, application data,
 credentials, or TLS overrides. All 14 eMudhra/emSign test hosts must fail with an
 issuer-chain verification error, while Cloudflare and Open-Meteo must complete
-TLS. HTTP status is irrelevant to the TLS control. DNS, expiry, hostname, and
-network failures are inconclusive and fail CI. The receipt records runtime,
-aiohttp version, CA package, bundle hash, source SHA, and local image identity.
+TLS. HTTP status is irrelevant to the TLS control. Expiry and hostname failures
+are inconclusive and fail CI; DNS and network failures are inconclusive and fail
+CI if they persist. Because a single live connection can stall (seen once in an
+emulated ARM64 build), transport-only failures get a fresh attempt: a timeout,
+DNS or connection error with no TLS error anywhere in its exception
+chain, or a diagnostic capture that saw no chain at all. A host gets at most 3
+attempts (after 2s, then 5s) and still fails CI if the failure persists, which
+takes about 6 minutes at worst. Certificate verdicts, other TLS errors, chain
+mismatches and validity-window failures are final and never retried, and every
+host must still end with its expected result. The receipt records runtime,
+aiohttp version, CA package, bundle hash, source SHA, and local image identity,
+plus each host's attempts, elapsed seconds and any retried results.
 
 The public endpoint cohort is documented by
 https://github.com/galadran/we-have-a-problem.com/tree/24ec06bbc38cedd378ded691610eb6dd4d9d3c6a
@@ -34,7 +43,9 @@ aiohttp request always retains default verification.
 These are live handshake tests with pinned chain identity, not offline archive
 verification. The identity capture and aiohttp test are separate connections;
 remote certificates can rotate. Any mismatch/inconclusive result requires
-investigation, not relaxation of the gate.
+investigation, not relaxation of the gate. Retried attempts stay in the receipt
+(the `tls-qualification-*` artifact for the native jobs, the build log for the
+in-image gate), so a run that passed only after a retry can still be investigated.
 
 Run offline tests with `pip install -c ci/test-constraints.txt -e '.[test]'`
 then `pytest --cov=scraper --cov-fail-under=80`. The test-only constraint avoids

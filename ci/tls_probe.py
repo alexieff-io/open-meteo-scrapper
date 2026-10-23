@@ -2,6 +2,8 @@
 
 Only issuer-chain verification failures prove rejection. Expiry, hostname,
 DNS, timeouts, and other errors fail the gate rather than masquerading as distrust.
+Transport failures alone get a fresh attempt (MAX_ATTEMPTS in all) and still fail
+the gate if they persist; any verdict or identity failure is final.
 The endpoints are public live peers, not pinned certificate archive fixtures.
 """
 import asyncio
@@ -14,6 +16,7 @@ import re
 import ssl
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 GOOD_HOSTS = ('www.cloudflare.com', 'api.open-meteo.com')
@@ -25,10 +28,14 @@ BAD_HOSTS = tuple(
 ) + ('dv-g3b-noct-emudhra.we-have-a-problem.com',
      'dv-g3b-aaa-noct-emudhra.we-have-a-problem.com')
 CA_VERSION = '20250419~deb12u2'
+# A live connection can stall (seen once in an emulated ARM64 build); retry only what proved nothing.
+MAX_ATTEMPTS = 3
+RETRY_DELAYS = (2, 5)
 
 
 def classify(error):
     pending, seen = [error], set()
+    network = tls = False
     while pending and len(seen) < 32:
         current = pending.pop()
         if not isinstance(current, BaseException) or id(current) in seen:
@@ -38,10 +45,35 @@ def classify(error):
         if isinstance(current, ssl.SSLCertVerificationError) and code is not None:
             return {'result': 'certificate-rejected' if code in (20, 21, 27)
                     else 'inconclusive', 'verifyCode': code}
+        network = network or isinstance(current, OSError)
+        tls = tls or isinstance(current, ssl.SSLError)
         pending.extend(getattr(current, name, None) for name in
                        ('__cause__', '__context__', 'reason', 'certificate_error'))
         pending.extend(current.args)
-    return {'result': 'inconclusive', 'errorType': type(error).__name__}
+    # Timeouts, DNS and refused/reset connections are OSErrors; ssl.SSLError is one too,
+    # so any TLS-layer error anywhere in the chain keeps the attempt final.
+    return {'result': 'inconclusive', 'errorType': type(error).__name__,
+            'transport': network and not tls}
+
+
+def retryable(row):
+    # Only attempts that never reached a verdict: a transport failure, or a bad host whose
+    # diagnostic capture saw no chain at all. Certificate verdicts, other verify codes,
+    # a served chain that differs from the pin, and the validity window are final.
+    if row['result'] != 'inconclusive':
+        return False
+    return row.get('chainSha256') == [] or row.get('transport') is True
+
+
+async def with_retries(attempt, host, sleep=asyncio.sleep):
+    retried = []
+    for number in range(1, MAX_ATTEMPTS + 1):
+        # Each attempt redoes the whole host procedure, so the kept row is one attempt's.
+        row = await attempt(host)
+        if number == MAX_ATTEMPTS or not retryable(row):
+            return {**row, 'attempts': number, **({'retried': retried} if retried else {})}
+        retried.append({key: value for key, value in row.items() if key != 'host'})
+        await sleep(RETRY_DELAYS[number - 1])
 
 
 def validate(rows):
@@ -93,22 +125,27 @@ async def probe():
     # No ssl=False, custom CA, proxy environment, or application credentials.
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
         async def one(host):
+            identity = {}
+            if host in BAD_HOSTS:
+                if not valid_at(windows[host], datetime.datetime.now(datetime.timezone.utc)):
+                    return {'host': host, 'result': 'inconclusive', 'reason': 'pinned-chain-outside-validity'}
+                observed = await identify_chain(host)
+                identity = {'chainSha256': observed,
+                            'chainMatchesArchive': observed == expected_chains[host]}
+                if not identity['chainMatchesArchive']:
+                    return {'host': host, 'result': 'inconclusive', **identity}
+            try:
+                async with session.get('https://' + host + '/', allow_redirects=False) as response:
+                    return {'host': host, 'result': 'accepted', 'status': response.status, **identity}
+            except Exception as error:
+                return {'host': host, **classify(error), **identity}
+
+        async def attempt(host):
             async with gate:
-                identity = {}
-                if host in BAD_HOSTS:
-                    if not valid_at(windows[host], datetime.datetime.now(datetime.timezone.utc)):
-                        return {'host': host, 'result': 'inconclusive', 'reason': 'pinned-chain-outside-validity'}
-                    observed = await identify_chain(host)
-                    identity = {'chainSha256': observed,
-                                'chainMatchesArchive': observed == expected_chains[host]}
-                    if not identity['chainMatchesArchive']:
-                        return {'host': host, 'result': 'inconclusive', **identity}
-                try:
-                    async with session.get('https://' + host + '/', allow_redirects=False) as response:
-                        return {'host': host, 'result': 'accepted', 'status': response.status, **identity}
-                except Exception as error:
-                    return {'host': host, **classify(error), **identity}
-        return await asyncio.gather(*(one(host) for host in GOOD_HOSTS + BAD_HOSTS))
+                started = time.monotonic()
+                row = await one(host)
+            return {**row, 'seconds': round(time.monotonic() - started, 1)}
+        return await asyncio.gather(*(with_retries(attempt, host) for host in GOOD_HOSTS + BAD_HOSTS))
 
 
 def main():
