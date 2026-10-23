@@ -145,7 +145,7 @@ class OpenMeteoCollector:
             location: The target location.
             variables: List of hourly variable names to request.
             past_days: Number of past days to include (default: 1).
-            forecast_days: Number of forecast days to include (default: 2).
+            forecast_days: Number of forecast days to include (default: 16).
 
         Returns:
             List of metric points for each variable and timestep.
@@ -197,7 +197,7 @@ class OpenMeteoCollector:
             location: The target location.
             variables: List of daily variable names to request.
             past_days: Number of past days to include (default: omitted).
-            forecast_days: Number of forecast days to include (default: 7).
+            forecast_days: Number of forecast days to include (default: 16).
 
         Returns:
             List of metric points for each variable and day.

@@ -14,8 +14,12 @@ python -m scraper.main --backfill --past-days 30
 # With a specific config file
 python -m scraper.main --config config.yml --backfill --past-days 30
 
-# Docker
-docker run weather-scraper --backfill --past-days 45
+# Docker (needs a config with at least one location)
+docker run --rm \
+  -e OPEN_METEO_URL=http://host.docker.internal:8080 \
+  -e VICTORIA_METRICS_URL=http://host.docker.internal:8428 \
+  -v $(pwd)/config.yml:/etc/weather-scraper/config.yml:ro \
+  weather-scraper:latest --backfill --past-days 45
 ```
 
 ## Options

@@ -64,9 +64,7 @@ the final Dockerfile build step runs the same gate inside the exact runtime bein
 built for publication. Both CI build paths disable the build cache, so publication
 cannot reuse a previous live-check layer or push an independently rebuilt,
 untested runtime. The diagnostic files are build-time mounts only.
-Merging to `main` still invokes the existing image publisher at
-`ghcr.io/alexieff-io/open-meteo-scrapper`; that destination was already anonymously
-readable as of 2026-10-22. This change does not alter its visibility or credentials.
-Review and merge remain owner actions. No release tag or chart change is part
-of this fix. The existing `v*` tag workflow also publishes Helm charts, so do not
-create a tag for an image-only update.
+Pushes to `main` publish the image to `ghcr.io/alexieff-io/open-meteo-scrapper`
+(tags `main` and `sha-<short>`); the package was anonymously readable as of
+2026-10-22. A `v*` tag publishes the versioned image tags and `latest`, and also
+packages and pushes the Helm chart, so an image-only change needs no tag.

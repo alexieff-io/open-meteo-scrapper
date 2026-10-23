@@ -26,8 +26,9 @@ RUN chown -R scraper:scraper /app
 
 EXPOSE 9090
 
+# The slim base has no wget/curl, so probe with the bundled Python.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost:9090/metrics || exit 1
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9090/metrics', timeout=4)"]
 
 USER scraper
 

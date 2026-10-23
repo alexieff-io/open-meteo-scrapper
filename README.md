@@ -25,6 +25,8 @@ The scraper runs 4 concurrent collection loops:
 - **Daily forecast** — every 6 hours
 - **Air quality** — every hour 
 
+For a one-shot load of historical data, see [BACKFILL.md](BACKFILL.md).
+
 ## Prerequisites
 
 - Kubernetes cluster (1.25+)
@@ -42,7 +44,9 @@ The scraper runs 4 concurrent collection loops:
 docker build -t weather-scraper:latest .
 ```
 
-The GitHub Actions workflow automatically builds multi-arch images (amd64/arm64) and pushes to GitHub Container Registry on every push to `main` and on version tags, no yes.
+The build runs a live TLS trust check inside the image, so it needs outbound HTTPS. See [ci/README.md](ci/README.md).
+
+The GitHub Actions workflow builds multi-arch images (amd64/arm64) and pushes them to GitHub Container Registry on every push to `main` and on `v*` version tags. Pull requests build and test the image without pushing it. See [CI/CD](#cicd).
 
 ### Using the pre-built image
 
@@ -99,10 +103,25 @@ curl -s http://localhost:9090/metrics
 | `scrape.hourlyForecastInterval` | Hourly forecast scrape interval (s) | `3600` |
 | `scrape.dailyForecastInterval` | Daily forecast scrape interval (s) | `21600` |
 | `scrape.airQualityInterval` | Air quality scrape interval (s) | `3600` |
+| `scrape.hourlyVariables` | Open-Meteo hourly variables to collect | see `values.yaml` |
+| `scrape.dailyVariables` | Open-Meteo daily variables to collect | see `values.yaml` |
+| `scrape.airQualityVariables` | Open-Meteo air quality variables to collect | see `values.yaml` |
+| `locations` | Locations to collect (see below) | Berlin, New York, London, Tokyo |
+| `resources` | Container resource requests and limits | `100m`/`192Mi` requests, `200m`/`256Mi` limits |
+| `extraEnv` | Extra container environment variables | `[]` |
+| `probes.liveness.enabled` / `probes.readiness.enabled` | HTTP probes against `/metrics` | `true` |
 | `serviceMonitor.enabled` | Create Prometheus ServiceMonitor | `false` |
+| `serviceMonitor.interval` | ServiceMonitor scrape interval | `30s` |
 | `grafanaDashboards.enabled` | Create dashboard ConfigMaps | `true` |
 | `grafanaDashboards.label` | Grafana sidecar discovery label | `grafana_dashboard` |
-| `grafanaDashboards.folder` | Grafana folder name | `Weather` |
+| `grafanaDashboards.labelValue` | Value of the discovery label | `"1"` |
+| `grafanaDashboards.folder` | Grafana folder name (`grafana_folder` annotation) | `Weather` |
+| `grafanaDashboards.annotations` | Extra annotations on the dashboard ConfigMaps | `{}` |
+| `networkPolicy.enabled` | Create a NetworkPolicy (egress allows only DNS plus `additionalEgress`) | `false` |
+| `networkPolicy.prometheusNamespace` | Namespace allowed to reach `:9090` (empty: pods in the release namespace) | `monitoring` |
+| `networkPolicy.additionalEgress` | Extra egress rules; must allow Open-Meteo and Victoria Metrics | `[]` |
+| `autoscaling.enabled` | Create a HorizontalPodAutoscaler | `false` |
+| `podDisruptionBudget.enabled` | Create a PodDisruptionBudget | `false` |
 
 ### Configuring Locations
 
@@ -146,15 +165,20 @@ These environment variables override their corresponding config file values:
 | `VICTORIA_METRICS_URL` | `victoria_metrics.url` |
 | `VM_IMPORT_ENDPOINT` | `victoria_metrics.import_endpoint` |
 | `VM_BATCH_SIZE` | `victoria_metrics.batch_size` |
+| `VM_REQUEST_TIMEOUT` | `victoria_metrics.request_timeout` |
 | `LOG_LEVEL` | `logging.level` |
 | `LOG_FORMAT` | `logging.format` |
 | `CONFIG_PATH` | Path to config YAML file |
+
+Two settings have no Helm value: `scrape.max_concurrent_locations` (config file only, default `10`) and `victoria_metrics.request_timeout` (default `30` seconds; with Helm, set `VM_REQUEST_TIMEOUT` through `extraEnv`). See [config.yml.example](config.yml.example) for every config file key.
 
 ## Grafana Dashboards
 
 ### Auto-Provisioning (Recommended)
 
-When `grafanaDashboards.enabled=true` (default), the Helm chart creates ConfigMaps labeled for Grafana sidecar discovery. If your Grafana is deployed via kube-prometheus-stack (or has a sidecar watching for `grafana_dashboard: "1"` labels), dashboards appear automatically in the "Weather" folder.
+When `grafanaDashboards.enabled=true` (default), the Helm chart creates ConfigMaps labeled for Grafana sidecar discovery. If your Grafana is deployed via kube-prometheus-stack (or has a sidecar watching for `grafana_dashboard: "1"` labels), the dashboards are loaded automatically.
+
+The chart puts them in the "Weather" folder through a `grafana_folder` annotation. The sidecar only reads that annotation when it's configured to. In the Grafana Helm chart, set `sidecar.dashboards.folderAnnotation: grafana_folder` and `sidecar.dashboards.provider.foldersFromFilesStructure: true` (under `grafana:` in kube-prometheus-stack). Otherwise the dashboards land in the sidecar's default folder.
 
 ### Manual Import
 
@@ -172,38 +196,38 @@ Dashboard JSON files are in the `dashboards/` directory for manual import:
 | **Weather Overview** | Temperature gauges, wind, humidity, pressure, precipitation, UV index, cloud cover across all locations |
 | **Weather Detail** | Deep dive for a single location: actual vs apparent temperature, dewpoint, wind direction, visibility, snow depth, 7-day forecast |
 | **Air Quality** | EU/US AQI indices, PM2.5, PM10, ozone, NO2, CO, SO2 levels per location |
+| **Migraine Weather Triggers** | Common migraine triggers per location: 6h pressure change, 24h temperature change, humidity and dewpoint, UV index, wind gusts, US AQI, PM2.5 and ozone |
 | **Scraper Health** | Self-monitoring: scrape durations, error rates, export throughput, latency percentiles |
 
 ## Available Metrics
 
 ### Weather Metrics
 
-| Metric | Labels | Unit | Source |
+Every weather metric carries the `location`, `latitude` and `longitude` labels plus the location's custom `labels`.
+
+**Current weather** (fixed names):
+
+| Metric | Unit |
+|---|---|
+| `weather_temperature_celsius` | celsius |
+| `weather_wind_speed_kmh` | km/h |
+| `weather_wind_direction_degrees` | degrees |
+| `weather_condition_code` | WMO weather code |
+| `weather_is_day` | 0/1 |
+
+**Forecasts and air quality** are named after the Open-Meteo variable, so the variable lists in `scrape` decide which series exist. Hourly and daily samples are timestamped at the forecast time, so they extend up to 16 days ahead.
+
+| Source | Metric name | Extra label | Default variables (unit) |
 |---|---|---|---|
-| `weather_temperature_celsius` | location, latitude, longitude, + custom | celsius | Current weather |
-| `weather_wind_speed_kmh` | location, latitude, longitude, + custom | km/h | Current weather |
-| `weather_wind_direction_degrees` | location, latitude, longitude, + custom | degrees | Current weather |
-| `weather_condition_code` | location, latitude, longitude, + custom | code | Current weather |
-| `weather_is_day` | location, latitude, longitude, + custom | boolean | Current weather |
-| `weather_temperature_2m` | location, ..., frequency=hourly | celsius | Hourly forecast |
-| `weather_relative_humidity_2m` | location, ..., frequency=hourly | % | Hourly forecast |
-| `weather_dewpoint_2m` | location, ..., frequency=hourly | celsius | Hourly forecast |
-| `weather_apparent_temperature` | location, ..., frequency=hourly | celsius | Hourly forecast |
-| `weather_pressure_msl` | location, ..., frequency=hourly | hPa | Hourly forecast |
-| `weather_wind_speed_10m` | location, ..., frequency=hourly | km/h | Hourly forecast |
-| `weather_precipitation` | location, ..., frequency=hourly | mm | Hourly forecast |
-| `weather_cloudcover` | location, ..., frequency=hourly | % | Hourly forecast |
-| `weather_uv_index` | location, ..., frequency=hourly | index | Hourly forecast |
-| `weather_daily_temperature_2m_max` | location, ..., frequency=daily | celsius | Daily forecast |
-| `weather_daily_temperature_2m_min` | location, ..., frequency=daily | celsius | Daily forecast |
-| `weather_daily_precipitation_sum` | location, ..., frequency=daily | mm | Daily forecast |
-| `air_quality_european_aqi` | location, latitude, longitude, + custom | index | Air quality |
-| `air_quality_us_aqi` | location, latitude, longitude, + custom | index | Air quality |
-| `air_quality_pm2_5` | location, latitude, longitude, + custom | ug/m3 | Air quality |
-| `air_quality_pm10` | location, latitude, longitude, + custom | ug/m3 | Air quality |
-| `air_quality_ozone` | location, latitude, longitude, + custom | ug/m3 | Air quality |
+| Hourly forecast | `weather_<variable>` | `frequency="hourly"` | `temperature_2m`, `dewpoint_2m`, `apparent_temperature` (celsius); `relative_humidity_2m`, `cloudcover` (%); `pressure_msl`, `surface_pressure` (hPa); `wind_speed_10m`, `wind_gusts_10m` (km/h); `wind_direction_10m` (degrees); `precipitation`, `rain` (mm); `snowfall` (cm); `snow_depth`, `visibility` (m); `uv_index` (index); `is_day` (0/1) |
+| Daily forecast | `weather_daily_<variable>` | `frequency="daily"` | `temperature_2m_max`, `temperature_2m_min`, `apparent_temperature_max`, `apparent_temperature_min` (celsius); `precipitation_sum`, `rain_sum` (mm); `snowfall_sum` (cm); `precipitation_hours` (h); `wind_speed_10m_max`, `wind_gusts_10m_max` (km/h); `wind_direction_10m_dominant` (degrees); `uv_index_max` (index) |
+| Air quality | `air_quality_<variable>` | — | `pm10`, `pm2_5`, `carbon_monoxide`, `nitrogen_dioxide`, `sulphur_dioxide`, `ozone` (ug/m3); `european_aqi`, `us_aqi` (index) |
+
+For example, `weather_temperature_2m{frequency="hourly"}`, `weather_daily_precipitation_sum{frequency="daily"}` and `air_quality_pm2_5`.
 
 ### Self-Monitoring Metrics
+
+These are served on the pod's `:9090/metrics` endpoint for Prometheus/VM to scrape (ServiceMonitor or pod annotations). They are not pushed to Victoria Metrics.
 
 | Metric | Labels | Type | Description |
 |---|---|---|---|
@@ -267,6 +291,7 @@ curl -s 'http://localhost:8428/api/v1/query?query=weather_temperature_celsius' |
 
 **Network policies blocking traffic**
 - Verify NetworkPolicies allow egress from the scraper pod to Open-Meteo and Victoria Metrics ports
+- The chart's own policy (`networkPolicy.enabled=true`) allows only DNS egress, so add both services to `networkPolicy.additionalEgress`
 
 **Victoria Metrics import endpoint differences**
 - VMSingle uses `/api/v1/import/prometheus`
@@ -304,16 +329,27 @@ export LOG_FORMAT=console
 python -m scraper.main --config config.yml.example
 ```
 
+### Run tests
+
+```bash
+pip install -c ci/test-constraints.txt -e '.[test]'
+pytest --cov=scraper --cov-fail-under=80
+```
+
+The constraint file keeps aiohttp below 3.14 for tests only, because aioresponses doesn't support aiohttp 3.14 yet. The image still installs the latest aiohttp allowed by `requirements.txt`.
+
 ## CI/CD
 
-The included GitHub Actions workflow (`.github/workflows/build.yaml`) automatically:
+The GitHub Actions workflow (`.github/workflows/build.yaml`) runs on pull requests, on pushes to `main` and on `v*` tags:
 
-- Builds multi-architecture images (`linux/amd64`, `linux/arm64`)
-- Pushes to GitHub Container Registry (`ghcr.io`)
-- Tags images based on git refs:
-  - `main` branch → `main` tag
-  - `v1.2.3` tag → `1.2.3`, `1.2`, `1` tags
-  - Every commit → `sha-<short>` tag
-- Uses BuildKit layer caching for fast rebuilds
+- **test**: runs the test suite with an 80% coverage floor.
+- **qualify-image**: builds the image natively on amd64 and arm64 runners and checks its TLS trust store against live hosts. See [ci/README.md](ci/README.md).
+- **build**: builds multi-architecture images (`linux/amd64`, `linux/arm64`) with the build cache disabled, so the in-image TLS check runs again before every push. On `main` and tags it pushes to GitHub Container Registry (`ghcr.io`) and signs the image with cosign (keyless). Pull requests build without pushing.
+- **publish-helm-chart** (`v*` tags only): sets the chart's `version` and `appVersion` from the tag, then pushes the chart to `oci://ghcr.io/<owner>/charts/weather-scraper` and signs it.
+
+Images are tagged from the git ref:
+- `main` branch → `main`
+- `v1.2.3` tag → `1.2.3`, `1.2`, `1` and `latest`
+- Every pushed build → `sha-<short>`
 
 No secrets configuration is needed — it uses the built-in `GITHUB_TOKEN`.
