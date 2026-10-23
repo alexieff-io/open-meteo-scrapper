@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "open-meteo-scrapper"
-version = "1.0.0"
+version = "0.1.13"
 description = "Weather data scraper collecting from Open-Meteo and exporting to Victoria Metrics"
 requires-python = ">=3.12"
 dependencies = [
